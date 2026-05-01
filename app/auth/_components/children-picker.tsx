@@ -2,28 +2,10 @@
 
 import { useState } from "react";
 import { childrenApi, type ChildProfile } from "@/lib/api";
+import { getChildAvatarSrc } from "@/lib/child-avatar";
 import { validatePin } from "@/lib/validation";
 
 type Mode = "picker" | "add-child" | "child-login";
-
-const CHILD_AVATAR_IMAGES = [
-  "/images/tomo1.png",
-  "/images/tomo2.png",
-  "/images/tomo4.png",
-  "/images/tomo5.png",
-  "/images/tomo6.png",
-] as const;
-
-function getChildAvatarSrc(seed: string) {
-  if (!seed) return CHILD_AVATAR_IMAGES[0];
-
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
-  }
-
-  return CHILD_AVATAR_IMAGES[hash % CHILD_AVATAR_IMAGES.length];
-}
 
 interface ChildrenPickerProps {
   childProfiles: ChildProfile[];
@@ -197,7 +179,7 @@ function ProfileCard({
 }
 
 export function ChildrenPickerModal({
-  childProfiles: childrenList = [],
+  childProfiles = [],
   onChildSelect,
   onAddChild,
   defaultMode = "picker",
@@ -368,7 +350,7 @@ export function ChildrenPickerModal({
         {/* Header */}
         <div className="mb-20 text-center">
           <h1 className="text-5xl font-black tracking-[-0.06em] text-[#f49416] sm:text-6xl lg:text-7xl">
-            Who&apos;s exploring?
+            Who&apos;s watching?
           </h1>
           <p className="mt-6 text-lg font-medium text-[#5f4d42] sm:text-xl">
             Select a profile to continue with Tomo
@@ -388,7 +370,7 @@ export function ChildrenPickerModal({
             </div>
 
             {/* Children Avatars */}
-            {childrenList.map((childName) => (
+            {childProfiles.map((childName) => (
               <div key={childName.id} className="flex justify-center">
                 <ProfileCard
                   name={childName.name}

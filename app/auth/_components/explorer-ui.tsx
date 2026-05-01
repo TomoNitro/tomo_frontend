@@ -72,11 +72,7 @@ function SmallMascot({ tone }: { tone: SceneTone }) {
       <div className="relative flex h-[20rem] w-[16rem] items-center justify-center sm:h-[22rem] sm:w-[18rem]">
         <picture>
           <source srcSet={`/images/${imageName}.png`} type="image/png" />
-          <img
-            src={`/images/${imageName}.png`}
-            alt={`Tomo mascot ${imageName}`}
-            className="h-[20rem] w-[16rem] object-contain sm:h-[22rem] sm:w-[18rem]"
-          />
+          <img src={`/images/${imageName}.png`} alt={`Tomo mascot ${imageName}`} className="h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] object-contain" />
         </picture>
       </div>
 

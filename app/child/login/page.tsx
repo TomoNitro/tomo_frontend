@@ -194,8 +194,8 @@ export default function ChildLoginPage() {
           <CardShell>
             <div className="relative z-10">
               <form onSubmit={handleSubmit}>
-                <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
-                  Who&apos;s exploring?
+                  <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
+                  Who' s watching?
                 </h1>
                 <p className="mt-3 text-[1.05rem] font-medium text-[#6b5649]">
                   Enter your PIN to continue.

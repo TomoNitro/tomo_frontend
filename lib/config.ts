@@ -23,8 +23,11 @@ export const API_CONFIG = {
     CHILDREN: {
       REGISTER: "/api/children/register",
       LOGIN: "/api/children/login",
+      UPDATE_NAME: "/api/children/name",
       GET_LIST: "/api/children",
-      DELETE: "/api/children/:id",
+      MARKETS: "/api/children/markets",
+      COINS: "/api/children/coins",
+      SAVING_GOAL: "/api/children/saving-goal",
     },
   },
 };
