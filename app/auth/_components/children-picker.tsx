@@ -1,15 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { childrenApi } from "@/lib/api";
+import { childrenApi, type ChildProfile } from "@/lib/api";
 import { validatePin } from "@/lib/validation";
 
 type Mode = "picker" | "add-child" | "child-login";
 
+const CHILD_AVATAR_IMAGES = [
+  "/images/tomo1.png",
+  "/images/tomo2.png",
+  "/images/tomo4.png",
+  "/images/tomo5.png",
+  "/images/tomo6.png",
+] as const;
+
+function getChildAvatarSrc(seed: string) {
+  if (!seed) return CHILD_AVATAR_IMAGES[0];
+
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return CHILD_AVATAR_IMAGES[hash % CHILD_AVATAR_IMAGES.length];
+}
+
 interface ChildrenPickerProps {
-  children: string[];
-  onChildSelect: (childName: string) => void;
-  onAddChild: (username: string, pin: string) => void;
+  children: ChildProfile[];
+  onChildSelect: (child: ChildProfile | "parent") => void;
+  onAddChild?: (username: string, pin: string) => void;
   isLoadingChildren?: boolean;
 }
 
@@ -90,13 +109,24 @@ function SecondaryButton({
   );
 }
 
+function CardShell({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="relative w-full overflow-hidden rounded-[2.2rem] bg-[#fffaf0] px-6 py-8 shadow-[0_24px_30px_rgba(149,118,74,0.15)] ring-1 ring-black/5 sm:px-8 sm:py-10">
+      <div className="absolute right-0 top-0 h-32 w-32 translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f8e9ae]" />
+      {children}
+    </section>
+  );
+}
+
 function ProfileCard({
   name,
+  avatarSrc,
   onClick,
   isAddButton = false,
   isParent = false,
 }: {
   name: string;
+  avatarSrc?: string;
   onClick: () => void;
   isAddButton?: boolean;
   isParent?: boolean;
@@ -117,12 +147,12 @@ function ProfileCard({
 
       {/* Profile Circle */}
       <div
-        className={`relative flex h-40 w-40 items-center justify-center rounded-full transition-all duration-300 group-hover:scale-110 overflow-hidden ${
+        className={`relative flex h-40 w-40 items-center justify-center overflow-hidden transition-all duration-300 group-hover:scale-110 ${
           isParent
             ? "bg-white/10 backdrop-blur-sm"
             : isAddButton
               ? "border-4 border-dashed border-[#dcc4ac] bg-[#f3e5d2] group-hover:border-[#f39211] group-hover:bg-[#ffe071]/30"
-              : "bg-gradient-to-b from-[#cb4f0e] via-[#d96c12] to-[#b0410b] shadow-[0_20px_30px_rgba(144,60,13,0.2)] group-hover:shadow-[0_30px_50px_rgba(144,60,13,0.4)]"
+              : "bg-transparent"
         }`}
       >
         {isParent ? (
@@ -135,13 +165,14 @@ function ProfileCard({
             />
           </picture>
         ) : !isAddButton ? (
-          <>
-            <div className="absolute inset-[11%] rounded-full border-[0.4rem] border-white/65 bg-[#ffb62b]">
-              <div className="absolute left-[18%] top-[18%] h-[1.15rem] w-[1.15rem] rounded-full bg-[#fff0ca]" />
-              <div className="absolute right-[18%] top-[18%] h-[1.15rem] w-[1.15rem] rounded-full bg-[#fff0ca]" />
-              <div className="absolute left-1/2 top-[46%] h-[0.9rem] w-[0.9rem] -translate-x-1/2 rounded-full bg-[#4b2b1c]" />
-            </div>
-          </>
+          <picture>
+            <source srcSet={avatarSrc} type="image/png" />
+            <img
+              src={avatarSrc}
+              alt={name}
+              className="h-full w-full object-contain"
+            />
+          </picture>
         ) : (
           <span className="text-6xl font-light leading-none text-[#8f7b69] transition-all duration-300 group-hover:text-[#f39211] group-hover:scale-125">
             +
@@ -221,7 +252,7 @@ export function ChildrenPickerModal({
       setStatusMessage(response.error ?? "Gagal menambah anak");
     } else {
       setStatusMessage("Anak berhasil ditambahkan!");
-      onAddChild(childUsername, childPin);
+      onAddChild?.(childUsername, childPin);
       setTimeout(() => handleBack(), 1500);
     }
 
@@ -230,60 +261,91 @@ export function ChildrenPickerModal({
 
   if (mode === "add-child") {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
-        <div className="relative w-full max-w-md overflow-hidden rounded-[2.2rem] bg-[#fffaf0] px-6 py-8 shadow-[0_24px_30px_rgba(149,118,74,0.15)] ring-1 ring-black/5 sm:px-8 sm:py-10">
-          <div className="absolute right-0 top-0 h-32 w-32 translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f8e9ae]" />
+      <main className="fixed inset-0 z-50 min-h-screen bg-[#fffaf0] px-6 py-10 sm:px-10 lg:px-14">
+        <div className="absolute left-0 top-0 h-[32rem] w-[32rem] rounded-full bg-[#ffe071]/35 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-[28rem] w-[28rem] rounded-full bg-[#f0a22b]/20 blur-3xl" />
 
-          <div className="relative z-10">
-            <h2 className="text-3xl font-black tracking-[-0.06em] text-[#f49416]">
-              Add Explorer
-            </h2>
-            <p className="mt-2 text-[0.95rem] font-medium text-[#6b5649]">
-              Buat akun untuk anak Anda
-            </p>
+        <section className="relative mx-auto grid min-h-[calc(100vh-5rem)] max-w-7xl items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12">
+          <div className="order-2 lg:order-1">
+            <div className="relative flex min-h-[22rem] w-full items-center justify-center lg:min-h-[30rem]">
+              <div className="absolute left-1/2 top-1/2 h-[19rem] w-[19rem] -translate-x-1/2 -translate-y-[42%] rounded-full bg-[#ffe071]/55 blur-3xl" />
 
-            <div className="mt-8 space-y-5">
-              <InputFieldSmall
-                label="Child Username"
-                placeholder="username"
-                value={childUsername}
-                onChange={(value) => {
-                  setChildUsername(value);
-                  setErrors((prev) => ({
-                    ...prev,
-                    username: "",
-                  }));
-                }}
-                error={errors.username}
-              />
-              <InputFieldSmall
-                label="Child PIN"
-                placeholder="1234"
-                type="password"
-                value={childPin}
-                onChange={handlePinChange}
-                error={errors.pin}
-              />
+              <div className="relative flex h-[20rem] w-[16rem] items-center justify-center sm:h-[22rem] sm:w-[18rem]">
+                <picture>
+                  <source srcSet="/images/tomo1.png" type="image/png" />
+                  <img
+                    src="/images/tomo1.svg"
+                    alt="Tomo mascot"
+                    className="h-[20rem] w-[16rem] object-contain sm:h-[22rem] sm:w-[18rem]"
+                  />
+                </picture>
+              </div>
+
+              <div className="absolute left-1/2 top-[6%] w-[15rem] -translate-x-1/2 rounded-[20px] bg-white px-6 py-5 text-center shadow-[0_18px_32px_rgba(127,91,45,0.12)] sm:left-[18%] sm:translate-x-0">
+                <p className="text-[0.95rem] font-black leading-6 text-[#31291f]">
+                  "Ready to add a new profile?"
+                </p>
+                <div className="absolute bottom-[-10px] left-[38%] h-5 w-5 rotate-45 bg-white" />
+              </div>
             </div>
-
-            <div className="mt-8 space-y-3">
-              <PrimaryButton
-                onClick={handleAddChildSubmit}
-                isLoading={isSubmitting}
-              >
-                ADD EXPLORER
-              </PrimaryButton>
-              <SecondaryButton onClick={handleBack}>CANCEL</SecondaryButton>
-            </div>
-
-            {statusMessage && (
-              <p className="mt-4 text-center text-[0.9rem] font-semibold text-[#8b5a18]">
-                {statusMessage}
-              </p>
-            )}
           </div>
-        </div>
-      </div>
+
+          <div className="order-1 lg:order-2">
+            <CardShell>
+              <div className="relative z-10">
+                <div>
+                  <h2 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
+                    Add Profile
+                  </h2>
+                  <p className="mt-3 text-[1.05rem] font-medium text-[#6b5649]">
+                    Enter a name and PIN for the new child profile.
+                  </p>
+
+                  <div className="mt-8 space-y-5">
+                    <InputFieldSmall
+                      label="Profile Name"
+                      placeholder="username"
+                      value={childUsername}
+                      onChange={(value) => {
+                        setChildUsername(value);
+                        setErrors((prev) => ({
+                          ...prev,
+                          username: "",
+                        }));
+                      }}
+                      error={errors.username}
+                    />
+                    <InputFieldSmall
+                      label="PIN"
+                      placeholder="1234"
+                      type="password"
+                      value={childPin}
+                      onChange={handlePinChange}
+                      error={errors.pin}
+                    />
+                  </div>
+
+                  <div className="mt-8 space-y-3">
+                    <PrimaryButton
+                      onClick={handleAddChildSubmit}
+                      isLoading={isSubmitting}
+                    >
+                      ADD PROFILE
+                    </PrimaryButton>
+                    <SecondaryButton onClick={handleBack}>CANCEL</SecondaryButton>
+                  </div>
+
+                  {statusMessage && (
+                    <p className="mt-4 text-center text-[0.9rem] font-semibold text-[#8b5a18]">
+                      {statusMessage}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardShell>
+          </div>
+        </section>
+      </main>
     );
   }
 
@@ -297,10 +359,10 @@ export function ChildrenPickerModal({
         {/* Header */}
         <div className="mb-20 text-center">
           <h1 className="text-5xl font-black tracking-[-0.06em] text-[#f49416] sm:text-6xl lg:text-7xl">
-            Who is exploring today?
+            Who's watching?
           </h1>
           <p className="mt-6 text-lg font-medium text-[#5f4d42] sm:text-xl">
-            Select your adventurer to continue with Tomo
+            Select a profile to continue with Tomo
           </p>
         </div>
 
@@ -318,18 +380,19 @@ export function ChildrenPickerModal({
 
             {/* Children Avatars */}
             {childrenList.map((childName) => (
-              <div key={childName} className="flex justify-center">
+              <div key={childName.id} className="flex justify-center">
                 <ProfileCard
-                  name={childName}
+                  name={childName.name}
+                  avatarSrc={getChildAvatarSrc(childName.id || childName.name)}
                   onClick={() => onChildSelect(childName)}
                 />
               </div>
             ))}
 
-            {/* Add Explorer Button */}
+            {/* Add Profile Button */}
             <div className="flex justify-center">
               <ProfileCard
-                name="Add Explorer"
+                name="Add Profile"
                 onClick={handleAddChildClick}
                 isAddButton
               />
