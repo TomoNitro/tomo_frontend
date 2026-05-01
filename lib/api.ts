@@ -460,14 +460,16 @@ export const childrenApi = {
       };
     }
 
+    // Some backends expect the marketId in the POST body instead of the path.
     const res = await apiCall<{ message?: string; data?: SavingGoal }>(
-      `${API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL}/${encodeURIComponent(marketId)}`,
+      API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL,
       {
         method: "POST",
         credentials: "include",
         headers: {
           ...childAuthHeaders(),
         },
+        body: JSON.stringify({ marketId }),
       }
     );
 

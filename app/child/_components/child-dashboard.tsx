@@ -97,9 +97,9 @@ function ChildNavbar({ active }: { active: ChildPage }) {
   }
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-[#fffaf0]/92 shadow-[0_8px_22px_rgba(112,81,44,0.08)] backdrop-blur">
+    <header className="sticky top-0 z-30 h-16 border-b border-[#e8d4b0] bg-white/50 backdrop-blur-sm">
       <nav className="mx-auto flex h-full max-w-[1280px] items-center justify-between px-8 sm:px-10">
-        <Link href="/child/dashboard" className="text-[1.32rem] font-black tracking-[0.06em] text-[#f79316]">
+        <Link href="/child/dashboard" className="text-[1.32rem] font-black tracking-[0.06em] !text-[#f39211]">
           TOMO
         </Link>
         <div className="flex h-full items-center gap-9 text-[0.85rem] font-black">
@@ -107,10 +107,10 @@ function ChildNavbar({ active }: { active: ChildPage }) {
             <Link
               key={item.key}
               href={item.href}
-              className={`flex h-full items-center border-b-[3px] px-2 pt-[3px] transition-colors ${
+              className={`flex h-full items-center border-b-2 px-2 pt-[3px] transition-colors ${
                 active === item.key
-                  ? "border-[#ff9417] text-[#f79316]"
-                  : "border-transparent text-[#2f2821] hover:text-[#f79316]"
+                  ? "border-[#f39211] text-[#f39211]"
+                  : "border-transparent text-[#8d7661] hover:text-[#f39211]"
               }`}
             >
               {item.label}
@@ -118,13 +118,13 @@ function ChildNavbar({ active }: { active: ChildPage }) {
           ))}
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/child/profile" aria-label="Profile" className={`text-[#ff9417] transition-transform hover:scale-105 ${active === "profile" ? "scale-105" : ""}`}>
-            <Icon name="user" className="h-6 w-6" />
+          <Link href="/child/profile" aria-label="Profile" className={`h-10 w-10 rounded-full bg-gradient-to-br from-[#cb4f0e] via-[#d96c12] to-[#b0410b] transition-transform hover:scale-105 ${active === "profile" ? "ring-2 ring-[#f39211]" : ""}`}>
+            <span className="sr-only">Profile</span>
           </Link>
           <button
             type="button"
             onClick={handleLogout}
-            className="flex h-10 items-center gap-2 rounded-full bg-[#fff0cc] px-4 text-[0.8rem] font-black text-[#7b5d08] transition hover:-translate-y-0.5 hover:bg-[#ffe3a1]"
+            className="flex h-10 items-center gap-2 rounded-full bg-white/90 px-4 text-[0.8rem] font-black text-[#7b5d08] transition hover:-translate-y-0.5"
             aria-label="Keluar dari akun anak"
           >
             <Icon name="logout" className="h-4 w-4" />
