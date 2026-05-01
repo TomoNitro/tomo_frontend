@@ -226,11 +226,7 @@ export function RegisterForm() {
       setEmail("");
       setPassword("");
       setErrors({});
-      
-      // Redirect ke profile picker setelah 1 detik
-      setTimeout(() => {
-        window.location.href = "/profile";
-      }, 1000);
+      router.push("/profile");
     }
 
     setIsSubmitting(false);
