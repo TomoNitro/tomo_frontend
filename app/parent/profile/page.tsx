@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { authApi, childrenApi, parentApi, userApi, type ChildProfile } from "@/lib/api";
+import { authApi, childrenApi, userApi, type ChildProfile } from "@/lib/api";
 import { ChildrenPickerModal } from "@/app/auth/_components/children-picker";
 
 function getInitials(name: string) {
@@ -112,34 +112,6 @@ export default function EditProfile() {
       if (finalName) setParentName(finalName);
       if (finalEmail) setEmail(finalEmail);
 
-      const parentResponse = await parentApi.getInfo();
-      if (parentResponse.success && parentResponse.data && typeof parentResponse.data === "object") {
-        const parentData = parentResponse.data as Record<string, any>;
-        const source = parentData.data && typeof parentData.data === "object" ? parentData.data : parentData;
-        const apiName = source.username ?? source.name ?? source.fullName;
-        const apiEmail = source.email;
-
-        if (typeof apiName === "string" && apiName.trim()) {
-          const trimmedName = apiName.trim();
-          setParentName(trimmedName);
-          window.localStorage.setItem("tomoParentName", trimmedName);
-        }
-
-        if (typeof apiEmail === "string" && apiEmail.trim()) {
-          const trimmedEmail = apiEmail.trim();
-          setEmail(trimmedEmail);
-          window.localStorage.setItem("tomoParentEmail", trimmedEmail);
-        }
-
-        window.localStorage.setItem(
-          "tomoParentProfile",
-          JSON.stringify({
-            name: typeof apiName === "string" ? apiName.trim() : finalName,
-            email: typeof apiEmail === "string" ? apiEmail.trim() : finalEmail,
-          })
-        );
-      }
-
       const childrenResponse = await childrenApi.getList();
 
       if (childrenResponse.success && Array.isArray(childrenResponse.data)) {
@@ -220,6 +192,9 @@ export default function EditProfile() {
   const handleLogout = async () => {
     await authApi.logout();
     window.localStorage.removeItem("tomoAuthToken");
+    window.localStorage.removeItem("tomoParentName");
+    window.localStorage.removeItem("tomoParentEmail");
+    window.localStorage.removeItem("tomoParentProfile");
     router.push("/");
   };
 
@@ -342,7 +317,13 @@ export default function EditProfile() {
               ))}
             </div>
 
-
+            {/* Additional Actions */}
+            <div className="mt-8 space-y-3">
+              <button className="w-full rounded-xl bg-[#f5e6d3] px-4 py-3 font-bold text-red-600 hover:bg-[#ead9c3] transition-colors flex items-center justify-center gap-2">
+                <DeleteIcon />
+                Delete Account
+              </button>
+            </div>
           </div>
         </div>
 
@@ -386,31 +367,6 @@ export default function EditProfile() {
           defaultMode="add-child"
           onClose={() => setIsAddingChild(false)}
         />
-      ) : null}
-
-      {deleteConfirmId ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="rounded-2xl bg-white p-8 shadow-xl max-w-sm mx-4">
-            <h3 className="text-lg font-bold text-[#3d3128] mb-4">Delete Child Profile</h3>
-            <p className="text-sm text-[#8d7661] mb-6">
-              Are you sure you want to delete this child profile? This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="flex-1 rounded-lg bg-[#f5e6d3] px-4 py-2 font-bold text-[#8d7661] hover:bg-[#ead9c3] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteChild(deleteConfirmId)}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
       ) : null}
     </main>
   );
