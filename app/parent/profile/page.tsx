@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { authApi, childrenApi, userApi, type ChildProfile } from "@/lib/api";
+import { authApi, childrenApi, parentApi, userApi, type ChildProfile } from "@/lib/api";
 import { ChildrenPickerModal } from "@/app/auth/_components/children-picker";
 
 function getInitials(name: string) {
@@ -112,6 +112,34 @@ export default function EditProfile() {
       if (finalName) setParentName(finalName);
       if (finalEmail) setEmail(finalEmail);
 
+      const parentResponse = await parentApi.getInfo();
+      if (parentResponse.success && parentResponse.data && typeof parentResponse.data === "object") {
+        const parentData = parentResponse.data as Record<string, any>;
+        const source = parentData.data && typeof parentData.data === "object" ? parentData.data : parentData;
+        const apiName = source.username ?? source.name ?? source.fullName;
+        const apiEmail = source.email;
+
+        if (typeof apiName === "string" && apiName.trim()) {
+          const trimmedName = apiName.trim();
+          setParentName(trimmedName);
+          window.localStorage.setItem("tomoParentName", trimmedName);
+        }
+
+        if (typeof apiEmail === "string" && apiEmail.trim()) {
+          const trimmedEmail = apiEmail.trim();
+          setEmail(trimmedEmail);
+          window.localStorage.setItem("tomoParentEmail", trimmedEmail);
+        }
+
+        window.localStorage.setItem(
+          "tomoParentProfile",
+          JSON.stringify({
+            name: typeof apiName === "string" ? apiName.trim() : finalName,
+            email: typeof apiEmail === "string" ? apiEmail.trim() : finalEmail,
+          })
+        );
+      }
+
       const childrenResponse = await childrenApi.getList();
 
       if (childrenResponse.success && Array.isArray(childrenResponse.data)) {
@@ -192,9 +220,6 @@ export default function EditProfile() {
   const handleLogout = async () => {
     await authApi.logout();
     window.localStorage.removeItem("tomoAuthToken");
-    window.localStorage.removeItem("tomoParentName");
-    window.localStorage.removeItem("tomoParentEmail");
-    window.localStorage.removeItem("tomoParentProfile");
     router.push("/");
   };
 

@@ -344,7 +344,7 @@ export function LoginForm() {
       setStatusMessage(response.error ?? "Login failed.");
     } else {
       setStatusMessage("Login successful.");
-      router.push("/profile");
+      router.push("/parent/profile");
     }
 
     setIsSubmitting(false);
