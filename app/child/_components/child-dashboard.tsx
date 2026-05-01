@@ -3,7 +3,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { childrenApi } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { childrenApi, type MarketItem } from "@/lib/api";
+import { getChildAvatarSrc } from "@/lib/child-avatar";
+import { readChildCoins } from "@/lib/child-coins";
+import { readSavingTargetId } from "@/lib/saving-target";
 import { ChildMarket } from "./child-market";
 
 type ChildPage = "home" | "lessons" | "profile";
@@ -15,7 +19,7 @@ const navItems = [
 
 const DEFAULT_CHILD_POINTS = 75;
 
-function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search" | "play" | "edit" | "coin"; className?: string }) {
+function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search" | "play" | "edit" | "coin" | "logout"; className?: string }) {
   const common = `${className} shrink-0`;
 
   if (name === "user") {
@@ -63,6 +67,15 @@ function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search
     );
   }
 
+  if (name === "logout") {
+    return (
+      <svg viewBox="0 0 24 24" className={common} fill="none" aria-hidden>
+        <path d="M9 20H6.5A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M14 8l4 4-4 4M18 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" className={common} fill="none" aria-hidden>
       <circle cx="12" cy="12" r="8" fill="currentColor" opacity=".18" />
@@ -72,6 +85,17 @@ function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search
 }
 
 function ChildNavbar({ active }: { active: ChildPage }) {
+  const router = useRouter();
+
+  function handleLogout() {
+    window.localStorage.removeItem("tomoChildAuthToken");
+    window.localStorage.removeItem("childAccessToken");
+    window.localStorage.removeItem("selectedChildId");
+    window.localStorage.removeItem("selectedChildName");
+    window.localStorage.removeItem("selectedUser");
+    router.replace("/profile");
+  }
+
   return (
     <header className="sticky top-0 z-30 h-16 bg-[#fffaf0]/92 shadow-[0_8px_22px_rgba(112,81,44,0.08)] backdrop-blur">
       <nav className="mx-auto flex h-full max-w-[1280px] items-center justify-between px-8 sm:px-10">
@@ -93,21 +117,46 @@ function ChildNavbar({ active }: { active: ChildPage }) {
             </Link>
           ))}
         </div>
-        <Link href="/child/profile" aria-label="Profile" className={`text-[#ff9417] transition-transform hover:scale-105 ${active === "profile" ? "scale-105" : ""}`}>
-          <Icon name="user" className="h-6 w-6" />
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/child/profile" aria-label="Profile" className={`text-[#ff9417] transition-transform hover:scale-105 ${active === "profile" ? "scale-105" : ""}`}>
+            <Icon name="user" className="h-6 w-6" />
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex h-10 items-center gap-2 rounded-full bg-[#fff0cc] px-4 text-[0.8rem] font-black text-[#7b5d08] transition hover:-translate-y-0.5 hover:bg-[#ffe3a1]"
+            aria-label="Keluar dari akun anak"
+          >
+            <Icon name="logout" className="h-4 w-4" />
+            <span>Keluar</span>
+          </button>
+        </div>
       </nav>
     </header>
   );
 }
 
-function MascotImage({ src, alt, className }: { src: string; alt: string; className: string }) {
+function MascotImage({
+  src,
+  alt,
+  className,
+  loading,
+  fetchPriority,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  loading?: "eager" | "lazy";
+  fetchPriority?: "high" | "low" | "auto";
+}) {
   return (
     <Image
       src={src}
       alt={alt}
       width={620}
       height={620}
+      loading={loading}
+      fetchPriority={fetchPriority}
       className={`${className} object-contain drop-shadow-[0_14px_20px_rgba(104,61,20,0.18)]`}
       sizes="(max-width: 768px) 60vw, 320px"
     />
@@ -135,14 +184,9 @@ export function ChildHomePage() {
   const [coins, setCoins] = useState(DEFAULT_CHILD_POINTS);
 
   useEffect(() => {
-    const loadCoins = async () => {
-      const response = await childrenApi.getCoins();
-      if (response.success) {
-        setCoins(response.data ?? DEFAULT_CHILD_POINTS);
-      }
-    };
-
-    loadCoins();
+    queueMicrotask(() => {
+      setCoins(readChildCoins(DEFAULT_CHILD_POINTS));
+    });
   }, []);
 
   return (
@@ -155,7 +199,13 @@ export function ChildHomePage() {
           <div className="relative z-10 grid items-center gap-6 md:grid-cols-[180px_1fr]">
             <div className="relative mx-auto h-44 w-44 md:h-48 md:w-48">
               <div className="absolute inset-3 rounded-full bg-[#ffc400]/25 blur-2xl" />
-              <MascotImage src="/images/tomo5.png" alt="Tomo membawa koin" className="relative h-full w-full" />
+              <MascotImage
+                src="/images/tomo5.png"
+                alt="Tomo membawa koin"
+                className="relative h-full w-full"
+                loading="eager"
+                fetchPriority="high"
+              />
             </div>
             <div className="text-center md:text-left">
               <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
@@ -342,32 +392,198 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 
 export function ChildProfilePage() {
+  const [profileName, setProfileName] = useState("Scout Alex");
+  const [profileAvatarSrc, setProfileAvatarSrc] = useState(getChildAvatarSrc(""));
+  const [profileCoins, setProfileCoins] = useState(DEFAULT_CHILD_POINTS);
+  const [savingTarget, setSavingTarget] = useState<MarketItem | null>(null);
+  const [isLoadingSavings, setIsLoadingSavings] = useState(true);
+  const [draftName, setDraftName] = useState("Scout Alex");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfileName, setIsSavingProfileName] = useState(false);
+  const [profileNameMessage, setProfileNameMessage] = useState("");
+  const [subtitleEnabled, setSubtitleEnabled] = useState(true);
+
+  useEffect(() => {
+    const storedName =
+      window.localStorage.getItem("selectedChildName") ||
+      window.localStorage.getItem("selectedUser") ||
+      "Scout Alex";
+    const storedChildId = window.localStorage.getItem("selectedChildId") || "";
+    const storedSubtitle = window.localStorage.getItem("tomoSubtitleEnabled");
+
+    queueMicrotask(() => {
+      setProfileName(storedName);
+      setProfileAvatarSrc(getChildAvatarSrc(storedChildId || storedName));
+      setProfileCoins(readChildCoins(DEFAULT_CHILD_POINTS));
+      setDraftName(storedName);
+      setSubtitleEnabled(storedSubtitle !== "false");
+    });
+
+    const loadSavings = async () => {
+      setIsLoadingSavings(true);
+      const targetId = readSavingTargetId();
+      const marketResponse = await childrenApi.getMarkets();
+
+      if (targetId && marketResponse.success) {
+        setSavingTarget(
+          (marketResponse.data ?? []).find((item) => item.id === targetId) ?? null
+        );
+      }
+
+      setIsLoadingSavings(false);
+    };
+
+    loadSavings();
+  }, []);
+
+  function openEditProfile() {
+    setDraftName(profileName);
+    setProfileNameMessage("");
+    setIsEditingProfile(true);
+  }
+
+  async function saveProfileName() {
+    const nextName = draftName.trim();
+
+    if (!nextName) {
+      setProfileNameMessage("Nama tidak boleh kosong.");
+      return;
+    }
+
+    setIsSavingProfileName(true);
+    setProfileNameMessage("");
+    const response = await childrenApi.updateName(nextName);
+
+    if (response.success) {
+      const updatedName = response.data?.name ?? nextName;
+      setProfileName(updatedName);
+      window.localStorage.setItem("selectedChildName", updatedName);
+      window.localStorage.setItem("selectedUser", updatedName);
+      setIsEditingProfile(false);
+    } else {
+      setProfileNameMessage(response.error ?? "Nama belum bisa disimpan.");
+    }
+
+    setIsSavingProfileName(false);
+  }
+
+  function toggleSubtitle() {
+    setSubtitleEnabled((currentValue) => {
+      const nextValue = !currentValue;
+      window.localStorage.setItem("tomoSubtitleEnabled", String(nextValue));
+      return nextValue;
+    });
+  }
+
+  const targetProgress = savingTarget?.price
+    ? Math.min(100, Math.round((profileCoins / savingTarget.price) * 100))
+    : 0;
+  const remainingCoins = savingTarget ? Math.max(0, savingTarget.price - profileCoins) : 0;
+
   return (
     <main className="min-h-screen bg-[#fbf5e8] pb-12">
       <ChildNavbar active="profile" />
-      <section className="mx-auto grid max-w-[1240px] gap-8 px-10 pt-20 lg:grid-cols-[1fr_380px]">
-        <div className="rounded-[2.6rem] bg-white px-10 py-16 shadow-[0_18px_34px_rgba(116,89,47,0.08)] md:flex md:items-center md:gap-10">
-          <div className="relative mx-auto h-44 w-44 shrink-0 rounded-full border-[8px] border-[#ffc000] bg-[#201a18] p-4 md:mx-0">
-            <MascotImage src="/images/tomo1.png" alt="Scout Alex" className="h-full w-full" />
-            <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 rotate-[3deg] rounded-[1rem] bg-[#ff6845] px-6 py-3 text-lg font-black text-white">LVL 12</span>
+      <section className="mx-auto grid max-w-[1240px] gap-6 px-5 pt-12 sm:px-8 lg:grid-cols-[1fr_360px] lg:gap-8 lg:pt-16">
+        <div className="relative overflow-hidden rounded-[2rem] bg-white px-6 py-8 shadow-[0_18px_34px_rgba(116,89,47,0.08)] ring-1 ring-[#ead6b2] md:flex md:items-center md:gap-9 md:px-8 md:py-10">
+          <div className="absolute right-0 top-0 h-40 w-40 translate-x-1/3 -translate-y-1/3 rounded-full bg-[#ffe071]/32 blur-3xl" />
+          <div className="relative mx-auto flex h-44 w-44 shrink-0 items-center justify-center md:mx-0">
+            <div className="absolute inset-2 rounded-full bg-gradient-to-br from-[#ffe071]/55 to-[#ff8128]/18 blur-xl" />
+            <div className="relative h-40 w-40 overflow-hidden rounded-full bg-transparent">
+              <MascotImage
+                src={profileAvatarSrc}
+                alt={profileName}
+                className="h-full w-full"
+                loading="eager"
+                fetchPriority="high"
+              />
+            </div>
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-[#ff6845] px-5 py-2 text-sm font-black text-white shadow-[0_10px_18px_rgba(255,104,69,0.24)]">
+              LVL 12
+            </span>
           </div>
-          <div className="mt-10 text-center md:mt-0 md:text-left">
-            <h1 className="inline-flex items-center gap-4 text-5xl font-black tracking-[-0.04em] text-[#f79316]">Scout Alex <Icon name="edit" className="h-5 w-5 text-[#7b5d08]" /></h1>
-            <p className="mt-4 max-w-xl text-xl font-black leading-8 text-[#5a4840]">Mastering the Wilderness of Numbers and Letters. Keep exploring!</p>
+          <div className="relative mt-9 min-w-0 flex-1 text-center md:mt-0 md:text-left">
+            <div className="flex flex-wrap items-center justify-center gap-4 md:justify-start">
+              <h1 className="min-w-0 break-words text-4xl font-black leading-tight text-[#f79316] sm:text-5xl">{profileName}</h1>
+              <button
+                type="button"
+                onClick={openEditProfile}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#fff0cc] text-[#7b5d08] shadow-[0_8px_14px_rgba(123,93,8,0.12)] transition hover:-translate-y-0.5 hover:bg-[#ffe3a1]"
+                aria-label="Edit nama profil"
+              >
+                <Icon name="edit" className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mt-3 text-[1rem] font-bold leading-7 text-[#6a5545]">
+              Keep collecting XP and badges on every adventure.
+            </p>
+            <div className="mx-auto mt-6 max-w-xl rounded-[1.2rem] bg-[#fff4d8] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] md:mx-0">
+              <div className="flex items-center justify-between gap-4 text-[0.9rem] font-black text-[#6d510b]">
+                <span>Level 12</span>
+                <span>750 / 1000 XP</span>
+              </div>
+              <div className="mt-3 h-4 overflow-hidden rounded-full bg-white shadow-[inset_0_2px_4px_rgba(125,92,37,0.12)]">
+                <div className="h-full w-[75%] rounded-full bg-gradient-to-r from-[#ffc000] to-[#ff9818]" />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-[2.6rem] bg-[#fa9818] px-10 py-12 text-center text-white shadow-[0_16px_28px_rgba(94,70,41,0.16)]">
-          <p className="text-5xl font-black">LEVEL</p>
-          <p className="mt-6 text-8xl font-black leading-none">12</p>
-          <div className="mx-auto mt-8 h-3 max-w-72 rounded-full bg-[#ffc36b]">
-            <div className="h-full w-[75%] rounded-full bg-[#ffc000]" />
+        <div className="relative overflow-hidden rounded-[2rem] bg-[#fa9818] px-7 py-8 text-white shadow-[0_16px_28px_rgba(94,70,41,0.16)]">
+          <div className="absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/18" />
+          <div className="relative">
+            <p className="text-[0.85rem] font-black uppercase tracking-[0.22em] text-white/82">Koin</p>
+            <div className="mt-2 flex items-end gap-3">
+              <p className="text-7xl font-black leading-none">{profileCoins}</p>
+              <Icon name="coin" className="mb-2 h-10 w-10 text-[#ffe071]" />
+            </div>
           </div>
-          <p className="mt-7 text-[0.9rem] font-bold">Only 5 days until Gold Tier!</p>
+
+          <div className="relative mt-7 rounded-[1.2rem] bg-white/18 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
+            <p className="text-[0.82rem] font-black uppercase tracking-[0.18em] text-white/82">Target</p>
+            {isLoadingSavings ? (
+              <div className="mt-4 h-24 animate-pulse rounded-[1rem] bg-white/18" />
+            ) : savingTarget ? (
+              <>
+                <div className="mt-4 flex items-center gap-4">
+                  <div className="relative h-20 w-20 shrink-0 rounded-[1rem] bg-white/18">
+                    <Image
+                      src={savingTarget.image_url}
+                      alt={savingTarget.title}
+                      fill
+                      sizes="80px"
+                      className="object-contain p-2 drop-shadow-[0_8px_12px_rgba(73,41,11,0.18)]"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-2xl font-black leading-tight">{savingTarget.title}</h2>
+                    <p className="mt-1 text-[0.9rem] font-bold text-white/86">
+                      {profileCoins}/{savingTarget.price} koin
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-full bg-[#8d5607]/38 p-1">
+                  <div
+                    className="h-3 rounded-full bg-[#ffe071] transition-all"
+                    style={{ width: `${targetProgress}%` }}
+                  />
+                </div>
+                <p className="mt-3 text-[0.9rem] font-black">
+                  {remainingCoins === 0 ? "Target siap dibuka!" : `Kurang ${remainingCoins} koin lagi`}
+                </p>
+              </>
+            ) : (
+              <div className="mt-4 rounded-[1rem] bg-white/18 px-4 py-5 text-center">
+                <p className="text-[0.95rem] font-black leading-6">Belum ada target</p>
+                <Link href="/child/dashboard" className="mt-3 inline-flex rounded-full bg-white px-4 py-2 text-[0.82rem] font-black text-[#f79316]">
+                  Pilih di Market
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
 
-        <section className="rounded-[1.8rem] border-4 border-[#ffc000] bg-[#ffeaaa] px-8 py-7 text-center">
-          <h2 className="text-4xl font-black tracking-[-0.03em] text-[#806006]">Badge Collection</h2>
+        <section className="rounded-[1.8rem] border-2 border-[#ffd253] bg-[#fff0b8] px-6 py-7 text-center shadow-[0_14px_24px_rgba(116,89,47,0.07)] md:px-8">
+          <h2 className="text-3xl font-black text-[#806006] sm:text-4xl">Badge Collection</h2>
           <div className="mt-8 flex flex-wrap justify-center gap-10">
             <Badge label="Spending Spree" color="bg-[#91d47b]" />
             <Badge label="The Trade-off" color="bg-[#87c9e9]" />
@@ -376,18 +592,90 @@ export function ChildProfilePage() {
         </section>
 
         <aside className="space-y-6">
-          <div className="rounded-[1.8rem] border-4 border-[#ffc000] bg-[#ffeaaa] px-6 py-5">
+          <div className="rounded-[1.8rem] border-2 border-[#ffd253] bg-[#fff0b8] px-6 py-5 shadow-[0_14px_24px_rgba(116,89,47,0.07)]">
             <h2 className="text-xl font-black text-[#5a4840]">Settings</h2>
             <div className="mt-5 flex items-center justify-between gap-5 text-lg font-black text-[#5a4840]">
-              <span>Subtitle in game</span>
-              <span className="relative h-6 w-14 rounded-full bg-[#ff9818]">
-                <span className="absolute right-1 top-1 h-4 w-4 rounded-full bg-[#ffc65a]" />
-              </span>
+              <span>Subtitle</span>
+              <button
+                type="button"
+                onClick={toggleSubtitle}
+                className={`relative h-9 w-20 rounded-full transition ${
+                  subtitleEnabled ? "bg-[#ff9818]" : "bg-[#d8cbb7]"
+                }`}
+                aria-pressed={subtitleEnabled}
+                aria-label="Subtitle in game"
+              >
+                <span className={`absolute top-1/2 -translate-y-1/2 text-[0.62rem] font-black text-white ${
+                  subtitleEnabled ? "left-3" : "right-3 text-[#7b6959]"
+                }`}>
+                  {subtitleEnabled ? "ON" : "OFF"}
+                </span>
+                <span
+                  className={`absolute top-1 h-7 w-7 rounded-full bg-white shadow transition ${
+                    subtitleEnabled ? "right-1" : "left-1"
+                  }`}
+                />
+              </button>
             </div>
           </div>
           <MascotImage src="/images/tomo2.png" alt="Tomo raja" className="mx-auto h-56 w-56" />
         </aside>
       </section>
+
+      {isEditingProfile ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2d1f12]/45 px-5">
+          <div className="w-full max-w-md overflow-hidden rounded-[1.6rem] bg-white shadow-[0_24px_60px_rgba(45,31,18,0.28)]">
+            <div className="flex items-center justify-between bg-[#fa9818] px-6 py-5 text-white">
+              <h2 className="text-2xl font-black">Edit Profil</h2>
+              <button
+                type="button"
+                onClick={() => setIsEditingProfile(false)}
+                disabled={isSavingProfileName}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/18 text-xl font-black"
+                aria-label="Tutup edit profil"
+              >
+                x
+              </button>
+            </div>
+            <div className="px-6 py-7">
+              <label className="block">
+                <span className="mb-2 block text-[0.9rem] font-black text-[#8a6408]">Nama</span>
+                <input
+                  value={draftName}
+                  onChange={(event) => setDraftName(event.target.value)}
+                  disabled={isSavingProfileName}
+                  className="h-14 w-full rounded-full bg-[#f0e6d2] px-5 text-[1.05rem] font-black text-[#3f3328] outline-none focus:ring-4 focus:ring-[#fa9818]/20"
+                  maxLength={24}
+                />
+              </label>
+              {profileNameMessage ? (
+                <p className="mt-3 rounded-[1rem] bg-red-50 px-4 py-3 text-[0.85rem] font-black text-red-600">
+                  {profileNameMessage}
+                </p>
+              ) : null}
+              <div className="mt-7 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingProfile(false)}
+                  disabled={isSavingProfileName}
+                  className="h-12 rounded-full bg-[#efe4cf] text-[0.95rem] font-black text-[#5b4635] disabled:opacity-60"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={saveProfileName}
+                  disabled={isSavingProfileName}
+                  aria-busy={isSavingProfileName}
+                  className="h-12 rounded-full bg-[#fa9818] text-[0.95rem] font-black text-white shadow-[0_10px_18px_rgba(232,113,31,0.22)] disabled:opacity-60"
+                >
+                  {isSavingProfileName ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

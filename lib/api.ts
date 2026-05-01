@@ -25,9 +25,19 @@ export interface MarketItem {
   created_at?: string;
 }
 
+export interface SavingGoal {
+  id: string;
+  market_id: string;
+  goal_name: string;
+  target_coin: number;
+  current_coin: number;
+}
+
 const AUTH_TOKEN_KEY = "tomoAuthToken";
 const CHILD_AUTH_TOKEN_KEY = "tomoChildAuthToken";
 const AUTH_TOKEN_FALLBACK_KEYS = ["accessToken", "token"];
+let pendingCoinsRequest: Promise<ApiResponse<number>> | null = null;
+let coinsEndpointUnavailable = false;
 
 function extractToken(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
@@ -212,6 +222,36 @@ export const childrenApi = {
     return res;
   },
 
+  updateName: async (name: string): Promise<ApiResponse<ChildProfile>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const res = await apiCall<{ message?: string; data?: ChildProfile }>(
+      API_CONFIG.ENDPOINTS.CHILDREN.UPDATE_NAME,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+        body: JSON.stringify({ name }),
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const body = res.data as { data?: unknown };
+    if (body?.data && typeof body.data === "object") {
+      return { success: true, data: body.data as ChildProfile };
+    }
+
+    return { success: false, error: "Profile anak tidak valid." };
+  },
+
   getList: async (parentId?: string): Promise<ApiResponse<ChildProfile[]>> => {
     const params = parentId ? `?parentId=${parentId}` : "";
     const res = await apiCall<{ message?: string; data?: ChildProfile[] }>(
@@ -281,10 +321,62 @@ export const childrenApi = {
       };
     }
 
-    const res = await apiCall<{ message?: string; data?: { amount?: number } }>(
-      API_CONFIG.ENDPOINTS.CHILDREN.COINS,
+    if (coinsEndpointUnavailable) {
+      return {
+        success: false,
+        error: "Data koin anak belum tersedia.",
+      };
+    }
+
+    if (pendingCoinsRequest) {
+      return pendingCoinsRequest;
+    }
+
+    pendingCoinsRequest = (async () => {
+      const res = await apiCall<{ message?: string; data?: { amount?: number } }>(
+        API_CONFIG.ENDPOINTS.CHILDREN.COINS,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            ...childAuthHeaders(),
+          },
+        }
+      );
+
+      if (!res.success) {
+        if (res.error?.includes("HTTP 404")) {
+          coinsEndpointUnavailable = true;
+        }
+
+        return { success: false, error: res.error };
+      }
+
+      const body = res.data as { data?: { amount?: unknown } };
+      if (typeof body?.data?.amount === "number") {
+        return { success: true, data: body.data.amount };
+      }
+
+      return { success: true, data: 0 };
+    })();
+
+    const response = await pendingCoinsRequest;
+    pendingCoinsRequest = null;
+    return response;
+  },
+
+  setSavingGoal: async (marketId: string): Promise<ApiResponse<SavingGoal>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const res = await apiCall<{ message?: string; data?: SavingGoal }>(
+      `${API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL}/${encodeURIComponent(marketId)}`,
       {
-        method: "GET",
+        method: "POST",
         credentials: "include",
         headers: {
           ...childAuthHeaders(),
@@ -294,12 +386,12 @@ export const childrenApi = {
 
     if (!res.success) return { success: false, error: res.error };
 
-    const body = res.data as { data?: { amount?: unknown } };
-    if (typeof body?.data?.amount === "number") {
-      return { success: true, data: body.data.amount };
+    const body = res.data as { data?: unknown };
+    if (body?.data && typeof body.data === "object") {
+      return { success: true, data: body.data as SavingGoal };
     }
 
-    return { success: true, data: 0 };
+    return { success: false, error: "Saving goal tidak valid." };
   },
 
 };
