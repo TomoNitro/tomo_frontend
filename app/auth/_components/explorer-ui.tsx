@@ -210,7 +210,7 @@ export function RegisterForm() {
 
           <div className="mt-8">
             <PrimaryAction>
-              {isSubmitting ? "SENDING..." : "LET'S GO! ⛵"}
+              {isSubmitting ? "SENDING..." : "LET'S GO!"}
             </PrimaryAction>
           </div>
 
@@ -258,7 +258,7 @@ export function LoginForm() {
         </div>
 
         <div className="mt-10">
-          <PrimaryAction>LET'S GO! 🚀</PrimaryAction>
+          <PrimaryAction>LET'S GO!</PrimaryAction>
         </div>
 
         <p className="mt-7 text-center text-[0.95rem] font-semibold text-[#6f5a4d]">
