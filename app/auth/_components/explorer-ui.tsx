@@ -276,6 +276,9 @@ export function RegisterForm() {
 
           <div className="mt-8">
             <PrimaryAction isLoading={isSubmitting}>LET'S GO!</PrimaryAction>
+            <PrimaryAction>
+              {isSubmitting ? "SENDING..." : "LET'S GO!"}
+            </PrimaryAction>
           </div>
 
           {statusMessage ? (
@@ -384,6 +387,9 @@ export function LoginForm() {
           <div className="mt-10">
             <PrimaryAction isLoading={isSubmitting}>LET'S GO!</PrimaryAction>
           </div>
+        <div className="mt-10">
+          <PrimaryAction>LET'S GO!</PrimaryAction>
+        </div>
 
           {statusMessage ? (
             <p className="mt-4 text-center text-[0.92rem] font-semibold text-[#8b5a18]">
