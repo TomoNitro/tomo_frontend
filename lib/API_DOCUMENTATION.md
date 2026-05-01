@@ -54,7 +54,7 @@ if (response.success) {
 }
 
 // Login
-const response = await authApi.login(username, password);
+const response = await authApi.login(email, password);
 
 // Logout
 const response = await authApi.logout();

@@ -61,10 +61,10 @@ export const authApi = {
     });
   },
 
-  login: async (username: string, password: string) => {
+  login: async (email: string, password: string) => {
     return apiCall(API_CONFIG.ENDPOINTS.AUTH.LOGIN, {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     });
   },
 
