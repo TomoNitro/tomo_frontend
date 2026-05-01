@@ -59,10 +59,14 @@ function SmallMascot({ tone }: { tone: SceneTone }) {
     <div className="relative flex min-h-[22rem] w-full items-center justify-center lg:min-h-[30rem]">
       <div className="absolute left-1/2 top-1/2 h-[19rem] w-[19rem] -translate-x-1/2 -translate-y-[42%] rounded-full bg-[#ffe071]/55 blur-3xl" />
 
-      <div className="relative h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] flex items-center justify-center">
+      <div className="relative flex h-[20rem] w-[16rem] items-center justify-center sm:h-[22rem] sm:w-[18rem]">
         <picture>
           <source srcSet={`/images/${imageName}.png`} type="image/png" />
-          <img src={`/images/${imageName}.svg`} alt={`Tomo mascot ${imageName}`} className="h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] object-contain" />
+          <img
+            src={`/images/${imageName}.svg`}
+            alt={`Tomo mascot ${imageName}`}
+            className="h-[20rem] w-[16rem] object-contain sm:h-[22rem] sm:w-[18rem]"
+          />
         </picture>
       </div>
 
@@ -141,13 +145,14 @@ function CardShell({ children }: { children: ReactNode }) {
   );
 }
 
-function PrimaryAction({ children }: { children: ReactNode }) {
+function PrimaryAction({ children, isLoading }: { children: ReactNode; isLoading?: boolean }) {
   return (
     <button
       type="submit"
-      className="inline-flex h-16 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#f59f1b] to-[#ff8128] px-8 text-[1.06rem] font-black text-white shadow-[0_18px_32px_rgba(243,133,28,0.26)] transition-transform duration-200 hover:-translate-y-0.5"
+      disabled={isLoading}
+      className="inline-flex h-16 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#f59f1b] to-[#ff8128] px-8 text-[1.06rem] font-black text-white shadow-[0_18px_32px_rgba(243,133,28,0.26)] transition-transform duration-200 hover:enabled:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
     >
-      {children}
+      {isLoading ? "SENDING..." : children}
     </button>
   );
 }
@@ -163,59 +168,45 @@ export function RegisterForm() {
 
   const handleUsernameChange = (value: string) => {
     setUsername(value);
-    const error = validateUsername(value);
     setErrors((prev) => ({
       ...prev,
-      username: error || "",
+      username: validateUsername(value) || "",
     }));
   };
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
-    const error = validateEmail(value);
     setErrors((prev) => ({
       ...prev,
-      email: error || "",
+      email: validateEmail(value) || "",
     }));
   };
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
-    const error = validatePassword(value);
     setErrors((prev) => ({
       ...prev,
-      password: error || "",
+      password: validatePassword(value) || "",
     }));
   };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatusMessage("");
+    setIsSubmitting(true);
 
-    // Validate all fields
     const validation = validateRegistration(username, email, password);
     if (!validation.isValid) {
       const errorMap: { [key: string]: string } = {};
       validation.errors.forEach((err) => {
         errorMap[err.field] = err.message;
       });
-
-      const data = (await response.json()) as { error?: string; message?: string };
-
-      if (!response.ok) {
-        setStatusMessage(data.error ?? "Registration failed.");
-        return;
-      }
-
-      setStatusMessage(data.message ?? "Registration sent successfully.");
-      router.push("/parent/dashboard");
-    } catch {
-      setStatusMessage("Unable to reach the register API.");
-    } finally {
+      setErrors(errorMap);
+      setStatusMessage("Harap periksa kembali form Anda");
       setIsSubmitting(false);
+      return;
     }
 
-    setIsSubmitting(true);
     const response = await authApi.register(username, email, password);
 
     if (!response.success) {
@@ -272,9 +263,7 @@ export function RegisterForm() {
           </div>
 
           <div className="mt-8">
-            <PrimaryAction>
-              {isSubmitting ? "SENDING..." : "LET'S GO!"}
-            </PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>LET'S GO!</PrimaryAction>
           </div>
 
           {statusMessage ? (
@@ -296,7 +285,8 @@ export function RegisterForm() {
 }
 
 export function LoginForm() {
-  const [username, setUsername] = useState("");
+  const router = useRouter();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -310,27 +300,42 @@ export function LoginForm() {
     }));
   };
 
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    setErrors((prev) => ({
+      ...prev,
+      password: validatePassword(value) || "",
+    }));
+  };
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
     setStatusMessage("");
+    setIsSubmitting(true);
 
-    const response = await authApi.login(username, password);
+    const emailError = validateEmail(email);
+    const passwordError = validatePassword(password);
 
-      const data = (await response.json()) as { error?: string; message?: string };
-
-      if (!response.ok) {
-        setStatusMessage(data.error ?? "Login failed.");
-        return;
-      }
-
-      setStatusMessage(data.message ?? "Login successful.");
-      router.push("/parent/dashboard");
-    } catch {
-      setStatusMessage("Unable to reach the login API.");
-    } finally {
+    if (emailError || passwordError) {
+      setErrors({
+        email: emailError || "",
+        password: passwordError || "",
+      });
+      setStatusMessage("Harap periksa kembali form Anda");
       setIsSubmitting(false);
+      return;
     }
+
+    const response = await authApi.login(email, password);
+
+    if (!response.success) {
+      setStatusMessage(response.error ?? "Login failed.");
+    } else {
+      setStatusMessage("Login successful.");
+      router.push("/profile");
+    }
+
+    setIsSubmitting(false);
   }
 
   return (
@@ -359,19 +364,13 @@ export function LoginForm() {
               placeholder="••••••••"
               type="password"
               value={password}
-              onChange={(value) => {
-                setPassword(value);
-                setErrors((prev) => ({
-                  ...prev,
-                  password: value ? "" : "Password tidak boleh kosong",
-                }));
-              }}
+              onChange={handlePasswordChange}
               error={errors.password}
             />
           </div>
 
           <div className="mt-10">
-            <PrimaryAction>{isSubmitting ? "SENDING..." : "LET'S GO!"}</PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>LET'S GO!</PrimaryAction>
           </div>
 
           {statusMessage ? (
