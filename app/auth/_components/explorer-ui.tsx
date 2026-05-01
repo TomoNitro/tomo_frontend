@@ -12,6 +12,16 @@ import {
 } from "@/lib/validation";
 
 type SceneTone = "wave" | "register" | "login";
+type RegisterResponseData = {
+  user?: {
+    username?: unknown;
+    email?: unknown;
+  };
+  data?: {
+    username?: unknown;
+    email?: unknown;
+  };
+};
 
 function FieldIcon({ kind }: { kind: "user" | "mail" | "lock" }) {
   if (kind === "user") {
@@ -212,7 +222,7 @@ export function RegisterForm() {
     if (!response.success) {
       setStatusMessage(response.error ?? "Registration failed.");
     } else {
-      const responseData = response.data as Record<string, any> | undefined;
+      const responseData = response.data as RegisterResponseData | undefined;
       const sender = responseData?.user ?? responseData?.data ?? {};
       const savedName = typeof sender.username === "string" ? sender.username.trim() : username;
       const savedEmail = typeof sender.email === "string" ? sender.email.trim() : email;
@@ -275,7 +285,7 @@ export function RegisterForm() {
           </div>
 
           <div className="mt-8">
-            <PrimaryAction isLoading={isSubmitting}>LET'S GO!</PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>LET&apos;S GO!</PrimaryAction>
           </div>
 
           {statusMessage ? (
@@ -382,7 +392,7 @@ export function LoginForm() {
           </div>
 
           <div className="mt-10">
-            <PrimaryAction isLoading={isSubmitting}>LET'S GO!</PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>LET&apos;S GO!</PrimaryAction>
           </div>
 
           {statusMessage ? (
