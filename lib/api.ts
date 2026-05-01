@@ -63,6 +63,31 @@ function storeTokenFromResponse(data: unknown) {
   }
 }
 
+function storeParentProfileFromResponse(data: unknown) {
+  if (typeof window === "undefined") return;
+  if (!data || typeof data !== "object") return;
+  const d = data as any;
+  const src = d.user || d.data || d.profile || d.parent || d;
+
+  const name =
+    (src && (src.username || src.name || src.fullName || src.full_name)) || "";
+  const email = (src && (src.email || "")) || "";
+  const id = (src && (src.id || src._id || src.parentId)) || "";
+
+  try {
+    if (typeof name === "string" && name.trim()) {
+      window.localStorage.setItem("tomoParentName", name.trim());
+    }
+    if (typeof email === "string" && email.trim()) {
+      window.localStorage.setItem("tomoParentEmail", email.trim());
+    }
+    const profileObj = { id: id || null, name: name || null, email: email || null };
+    window.localStorage.setItem("tomoParentProfile", JSON.stringify(profileObj));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 function storeChildTokenFromResponse(data: unknown) {
   if (typeof window === "undefined") return;
   const t = extractToken(data);
@@ -103,6 +128,43 @@ function childAuthHeaders(): Record<string, string> {
 
 function hasChildToken(): boolean {
   return Boolean(childAuthHeaders().Authorization);
+}
+
+function getFriendlyApiError(status: number, data: unknown): string {
+  const message =
+    data && typeof data === "object"
+      ? String(
+          (data as { error?: unknown; message?: unknown }).error ||
+            (data as { error?: unknown; message?: unknown }).message ||
+            ""
+        )
+      : "";
+  const normalized = message.toLowerCase();
+
+  if (
+    status === 400 &&
+    (normalized.includes("pin") ||
+      normalized.includes("password") ||
+      normalized.includes("invalid") )
+  ) {
+    return message || "Invalid request data.";
+  }
+
+  if (status === 401) return "Unauthorized. Please login again.";
+  if (status === 403) return "Access denied.";
+  if (status === 404) return message || "Resource not found.";
+  if (status >= 500) return "Server error. Please try again later.";
+
+  return message || `HTTP ${status}`;
+}
+
+function getFriendlyNetworkError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  try {
+    return String(error);
+  } catch {
+    return "Network error";
+  }
 }
 
 /**
