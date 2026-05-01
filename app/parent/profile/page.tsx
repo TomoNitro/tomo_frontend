@@ -342,13 +342,7 @@ export default function EditProfile() {
               ))}
             </div>
 
-            {/* Additional Actions */}
-            <div className="mt-8 space-y-3">
-              <button className="w-full rounded-xl bg-[#f5e6d3] px-4 py-3 font-bold text-red-600 hover:bg-[#ead9c3] transition-colors flex items-center justify-center gap-2">
-                <DeleteIcon />
-                Delete Account
-              </button>
-            </div>
+
           </div>
         </div>
 
@@ -392,6 +386,31 @@ export default function EditProfile() {
           defaultMode="add-child"
           onClose={() => setIsAddingChild(false)}
         />
+      ) : null}
+
+      {deleteConfirmId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="rounded-2xl bg-white p-8 shadow-xl max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-[#3d3128] mb-4">Delete Child Profile</h3>
+            <p className="text-sm text-[#8d7661] mb-6">
+              Are you sure you want to delete this child profile? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 rounded-lg bg-[#f5e6d3] px-4 py-2 font-bold text-[#8d7661] hover:bg-[#ead9c3] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteChild(deleteConfirmId)}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </main>
   );
