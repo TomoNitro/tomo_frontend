@@ -3,24 +3,8 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { childrenApi, type MarketItem } from "@/lib/api";
-
-const SAVING_TARGET_KEY_PREFIX = "tomoSavingTarget";
-
-function getSavingTargetKey() {
-  if (typeof window === "undefined") return SAVING_TARGET_KEY_PREFIX;
-  const childId = window.localStorage.getItem("selectedChildId");
-  return childId ? `${SAVING_TARGET_KEY_PREFIX}:${childId}` : SAVING_TARGET_KEY_PREFIX;
-}
-
-function readSavingTargetId() {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(getSavingTargetKey()) || "";
-}
-
-function saveSavingTargetId(id: string) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(getSavingTargetKey(), id);
-}
+import { saveChildCoins } from "@/lib/child-coins";
+import { readSavingTargetId, saveSavingTargetId } from "@/lib/saving-target";
 
 function MarketCard({
   item,
@@ -95,6 +79,7 @@ export function ChildMarket({ points }: { points: number }) {
   const [pendingTarget, setPendingTarget] = useState<MarketItem | null>(null);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingTarget, setIsSavingTarget] = useState(false);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -124,12 +109,29 @@ export function ChildMarket({ points }: { points: number }) {
     [items, targetId]
   );
 
-  function handleConfirmTarget() {
+  async function handleConfirmTarget() {
     if (!pendingTarget) return;
-    setTargetId(pendingTarget.id);
-    saveSavingTargetId(pendingTarget.id);
-    setMessage(`Target: ${pendingTarget.title}`);
-    setPendingTarget(null);
+
+    setIsSavingTarget(true);
+    setMessage("");
+    const response = await childrenApi.setSavingGoal(pendingTarget.id);
+
+    if (response.success) {
+      const nextTargetId = response.data?.market_id ?? pendingTarget.id;
+      const nextTargetName = response.data?.goal_name ?? pendingTarget.title;
+      const nextCoins = response.data?.current_coin;
+      setTargetId(nextTargetId);
+      saveSavingTargetId(nextTargetId);
+      if (typeof nextCoins === "number") {
+        saveChildCoins(nextCoins);
+      }
+      setMessage(`Target: ${nextTargetName}`);
+      setPendingTarget(null);
+    } else {
+      setMessage(response.error ?? "Target belum bisa disimpan.");
+    }
+
+    setIsSavingTarget(false);
   }
 
   return (
@@ -231,6 +233,7 @@ export function ChildMarket({ points }: { points: number }) {
               <button
                 type="button"
                 onClick={() => setPendingTarget(null)}
+                disabled={isSavingTarget}
                 className="h-12 rounded-full bg-[#efe4cf] text-[0.9rem] font-black text-[#5b4635]"
               >
                 Batal
@@ -238,7 +241,9 @@ export function ChildMarket({ points }: { points: number }) {
               <button
                 type="button"
                 onClick={handleConfirmTarget}
-                className="relative h-12 overflow-hidden rounded-full bg-[#fa9818] pl-8 pr-3 text-[0.9rem] font-black text-white shadow-[0_10px_18px_rgba(232,113,31,0.22)]"
+                disabled={isSavingTarget}
+                aria-busy={isSavingTarget}
+                className="relative h-12 overflow-hidden rounded-full bg-[#fa9818] pl-8 pr-3 text-[0.9rem] font-black text-white shadow-[0_10px_18px_rgba(232,113,31,0.22)] transition disabled:opacity-65"
               >
                 <Image
                   src="/images/tomonongol.png"
@@ -248,7 +253,7 @@ export function ChildMarket({ points }: { points: number }) {
                   className="pointer-events-none absolute -left-3 bottom-0 h-auto w-12"
                   aria-hidden
                 />
-                Pilih
+                {isSavingTarget ? "Menyimpan..." : "Pilih"}
               </button>
             </div>
           </div>

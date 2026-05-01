@@ -2,28 +2,10 @@
 
 import { useState } from "react";
 import { childrenApi, type ChildProfile } from "@/lib/api";
+import { getChildAvatarSrc } from "@/lib/child-avatar";
 import { validatePin } from "@/lib/validation";
 
 type Mode = "picker" | "add-child" | "child-login";
-
-const CHILD_AVATAR_IMAGES = [
-  "/images/tomo1.png",
-  "/images/tomo2.png",
-  "/images/tomo4.png",
-  "/images/tomo5.png",
-  "/images/tomo6.png",
-] as const;
-
-function getChildAvatarSrc(seed: string) {
-  if (!seed) return CHILD_AVATAR_IMAGES[0];
-
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
-  }
-
-  return CHILD_AVATAR_IMAGES[hash % CHILD_AVATAR_IMAGES.length];
-}
 
 interface ChildrenPickerProps {
   childProfiles: ChildProfile[];
@@ -159,7 +141,7 @@ function ProfileCard({
           <picture>
             <source srcSet="/images/tomo3.png" type="image/png" />
             <img
-              src="/images/tomo3.svg"
+              src="/images/tomo3.png"
               alt="Tomo parent"
               className="h-full w-full object-cover"
             />
@@ -274,7 +256,7 @@ export function ChildrenPickerModal({
                 <picture>
                   <source srcSet="/images/tomo1.png" type="image/png" />
                   <img
-                    src="/images/tomo1.svg"
+                    src="/images/tomo1.png"
                     alt="Tomo mascot"
                     className="h-[20rem] w-[16rem] object-contain sm:h-[22rem] sm:w-[18rem]"
                   />
