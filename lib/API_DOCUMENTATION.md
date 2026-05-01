@@ -54,7 +54,11 @@ if (response.success) {
 }
 
 // Login
+<<<<<<< HEAD
 const response = await authApi.login(email, password);
+=======
+const response = await authApi.login(username, password);
+>>>>>>> a6330a6 (Refactor code structure for improved readability and maintainability)
 
 // Logout
 const response = await authApi.logout();
@@ -72,6 +76,7 @@ const response = await userApi.getProfile();
 const response = await userApi.updateProfile({ name: "John" });
 ```
 
+<<<<<<< HEAD
 ### Children API
 
 ```typescript
@@ -87,6 +92,8 @@ const loginResponse = await childrenApi.login("child-uuid", "1234");
 const listResponse = await childrenApi.getList();
 ```
 
+=======
+>>>>>>> a6330a6 (Refactor code structure for improved readability and maintainability)
 ## Response Format
 
 Semua API calls mengembalikan struktur yang sama:
