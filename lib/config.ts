@@ -20,6 +20,9 @@ export const API_CONFIG = {
     PARENT: {
       INFO: "/api/parent/info",
     },
+    THEMES: {
+      GET_ALL: "/api/themes",
+    },
     CHILDREN: {
       REGISTER: "/api/children/register",
       LOGIN: "/api/children/login",

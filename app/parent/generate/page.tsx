@@ -1,16 +1,46 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { themeApi, type StoryThemes } from "@/lib/api";
+
+const FALLBACK_THEMES: StoryThemes = {
+  finance: [
+    { topic: "Menabung (Saving)" },
+    { topic: "Mengelola Uang (Budgeting)" },
+    { topic: "Tujuan Keuangan (Financial Goal Setting)" },
+    { topic: "Pilihan Bijak vs Impulsif" },
+    { topic: "Nilai Uang (Value of Money)" },
+    { topic: "Cara Mendapatkan Uang (Earning)" },
+    { topic: "Berbagi dan Sedekah" },
+    { topic: "Kebutuhan vs Keinginan" },
+    { topic: "Untung dan Rugi (Basic Risk)" },
+    { topic: "Pengaruh Iklan dan Godaan Konsumsi" },
+  ],
+  story: [{ topic: "SNOW WHITE" }],
+};
+
+function DropdownArrow() {
+  return (
+    <span className="pointer-events-none absolute right-4 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-[#ead8b9] text-[#8b5b14]">
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 fill-current">
+        <path d="M5.2 7.6a1 1 0 0 1 1.4 0L10 11l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 9a1 1 0 0 1 0-1.4Z" />
+      </svg>
+    </span>
+  );
+}
 
 export default function ParentGeneratePage() {
-  const [selectedTopic, setSelectedTopic] = useState("Finance");
-  const [selectedTheme, setSelectedTheme] = useState("Fairytale");
+  const [themeOptions, setThemeOptions] = useState<StoryThemes>(FALLBACK_THEMES);
+  const [selectedTopic, setSelectedTopic] = useState(FALLBACK_THEMES.finance[0]?.topic ?? "");
+  const [selectedTheme, setSelectedTheme] = useState(FALLBACK_THEMES.story[0]?.topic ?? "");
   const [prompt, setPrompt] = useState("Saving for a new toy...");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingThemes, setIsLoadingThemes] = useState(true);
+  const [themesError, setThemesError] = useState("");
 
-  const topics = ["Finance", "Health", "Education", "Social"];
-  const themes = ["Fairytale", "Adventure", "Mystery", "Fantasy"];
+  const topics = useMemo(() => themeOptions.finance.map((item) => item.topic), [themeOptions.finance]);
+  const themes = useMemo(() => themeOptions.story.map((item) => item.topic), [themeOptions.story]);
 
   const stories = [
     {
@@ -32,6 +62,32 @@ export default function ParentGeneratePage() {
     await new Promise((resolve) => setTimeout(resolve, 1400));
     setIsGenerating(false);
   }
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadThemes() {
+      const response = await themeApi.getAll();
+      if (!isMounted) return;
+
+      if (response.success && response.data) {
+        setThemeOptions(response.data);
+        setSelectedTopic(response.data.finance[0]?.topic ?? "");
+        setSelectedTheme(response.data.story[0]?.topic ?? "");
+        setThemesError("");
+      } else {
+        setThemesError(response.error ?? "Failed to load topics and themes.");
+      }
+
+      setIsLoadingThemes(false);
+    }
+
+    loadThemes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#fffaf0] via-[#fff5e6] to-[#ffe8cc]">
@@ -61,61 +117,78 @@ export default function ParentGeneratePage() {
                 What financial quest shall we embark on today? Tomo is ready to guide the way!
               </p>
 
-              <div className="mt-7 space-y-5">
-                <div>
-                  <p className="mb-2 text-lg font-black text-[#6b4f1f]">Pick the topic</p>
-                  <div className="flex flex-wrap gap-2">
-                    {topics.map((topic) => (
-                      <button
-                        key={topic}
-                        type="button"
-                        onClick={() => setSelectedTopic(topic)}
-                        className={`rounded-full px-4 py-2 text-sm font-black transition ${selectedTopic === topic ? "bg-[#f4b614] text-[#3f2f20]" : "bg-[#f8f1de] text-[#7b684d] hover:bg-[#fffaf0]"}`}
+              <div className="mt-8 rounded-[1.4rem] border border-[#dcc6a4] bg-white/55 p-4 shadow-[0_18px_40px_rgba(98,65,19,0.08)] sm:p-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-[#a06f16]">Finance topic</span>
+                    <span className="relative block">
+                      <select
+                        value={selectedTopic}
+                        onChange={(event) => setSelectedTopic(event.target.value)}
+                        className="h-14 w-full appearance-none rounded-2xl border border-[#d9c6a8] bg-[#fff8e9] px-4 pr-14 text-base font-black text-[#3f2f20] shadow-inner outline-none transition hover:bg-white focus:border-[#f4b614] focus:bg-white focus:ring-4 focus:ring-[#f4b614]/20"
                       >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
+                        {topics.map((topic) => (
+                          <option key={topic} value={topic}>
+                            {topic}
+                          </option>
+                        ))}
+                      </select>
+                      <DropdownArrow />
+                    </span>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-[#a06f16]">Story theme</span>
+                    <span className="relative block">
+                      <select
+                        value={selectedTheme}
+                        onChange={(event) => setSelectedTheme(event.target.value)}
+                        className="h-14 w-full appearance-none rounded-2xl border border-[#d9c6a8] bg-[#fff8e9] px-4 pr-14 text-base font-black text-[#3f2f20] shadow-inner outline-none transition hover:bg-white focus:border-[#f4b614] focus:bg-white focus:ring-4 focus:ring-[#f4b614]/20"
+                      >
+                        {themes.map((theme) => (
+                          <option key={theme} value={theme}>
+                            {theme}
+                          </option>
+                        ))}
+                      </select>
+                      <DropdownArrow />
+                    </span>
+                  </label>
                 </div>
 
-                <div>
-                  <p className="mb-2 text-lg font-black text-[#6b4f1f]">Pick the story theme</p>
-                  <div className="flex flex-wrap gap-2">
-                    {themes.map((theme) => (
-                      <button
-                        key={theme}
-                        type="button"
-                        onClick={() => setSelectedTheme(theme)}
-                        className={`rounded-full px-4 py-2 text-sm font-black transition ${selectedTheme === theme ? "bg-[#f4b614] text-[#3f2f20]" : "bg-[#f8f1de] text-[#7b684d] hover:bg-[#fffaf0]"}`}
-                      >
-                        {theme}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {isLoadingThemes ? (
+                  <p className="mt-4 rounded-xl bg-[#fff8e9] px-4 py-3 text-sm font-bold text-[#8d7661]">Loading topics and themes...</p>
+                ) : themesError ? (
+                  <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{themesError}</p>
+                ) : null}
 
-                <div>
-                  <p className="mb-2 text-lg font-black text-[#6b4f1f]">Generate the story</p>
-                  <div className="flex items-center gap-3 rounded-xl bg-[#e2dccb] px-3 py-3">
+                <label className="mt-5 block">
+                  <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-[#a06f16]">Story idea</span>
+                  <span className="flex items-center gap-3 rounded-2xl border border-[#d9c6a8] bg-[#fff8e9] px-4 py-3 shadow-inner transition focus-within:border-[#f4b614] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#f4b614]/20">
                     <img src="/images/tomo1.svg" alt="Tomo icon" className="h-8 w-8 object-contain" />
                     <input
                       type="text"
                       value={prompt}
                       onChange={(event) => setPrompt(event.target.value)}
-                      className="w-full bg-transparent text-base font-semibold text-[#6b5a4d] outline-none placeholder:text-[#9f8f7e]"
+                      className="w-full bg-transparent text-base font-bold text-[#4d3b2f] outline-none placeholder:text-[#9f8f7e]"
                       placeholder="Saving for a new toy..."
                     />
-                  </div>
-                </div>
+                  </span>
+                </label>
 
-                <button
-                  type="button"
-                  onClick={handleGenerateStory}
-                  disabled={isGenerating}
-                  className="inline-flex h-14 items-center justify-center rounded-full bg-gradient-to-r from-[#f59f1b] to-[#ff6d4d] px-8 text-lg font-black text-white shadow-[0_12px_24px_rgba(243,130,32,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isGenerating ? "Generating..." : "Generate Story ⚡"}
-                </button>
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm font-bold leading-6 text-[#755f4c]">
+                    {selectedTopic} with {selectedTheme}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGenerateStory}
+                    disabled={isGenerating}
+                    className="inline-flex h-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#f59f1b] to-[#ff6d4d] px-8 text-lg font-black text-white shadow-[0_12px_24px_rgba(243,130,32,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(243,130,32,0.34)] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isGenerating ? "Generating..." : "Generate Story"}
+                  </button>
+                </div>
               </div>
             </div>
 

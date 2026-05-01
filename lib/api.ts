@@ -17,18 +17,31 @@ export interface ChildProfile {
   created_at?: string;
 }
 
+export interface ThemeTopic {
+  topic: string;
+}
+
+export interface StoryThemes {
+  finance: ThemeTopic[];
+  story: ThemeTopic[];
+}
+
 const AUTH_TOKEN_KEY = "tomoAuthToken";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
 function extractToken(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const d = data as Record<string, any>;
+  if (!isRecord(data)) return null;
+  const d = data;
   if (typeof d.accessToken === "string") return d.accessToken;
   if (typeof d.token === "string") return d.token;
   if (typeof d.jwt === "string") return d.jwt;
-  if (d.Token && typeof d.Token === "object") {
+  if (isRecord(d.Token)) {
     return extractToken(d.Token);
   }
-  if (d.data && typeof d.data === "object") {
+  if (isRecord(d.data)) {
     return extractToken(d.data);
   }
   return null;
@@ -41,10 +54,9 @@ function storeTokenFromResponse(data: unknown) {
 }
 
 function storeParentProfileFromResponse(data: unknown) {
-  if (typeof window === "undefined" || !data || typeof data !== "object") return;
+  if (typeof window === "undefined" || !isRecord(data)) return;
 
-  const record = data as Record<string, any>;
-  const source = record.user && typeof record.user === "object" ? record.user : record.data && typeof record.data === "object" ? record.data : record;
+  const source = isRecord(data.user) ? data.user : isRecord(data.data) ? data.data : data;
 
   const name = source.username ?? source.name ?? source.fullName;
   const email = source.email;
@@ -192,10 +204,38 @@ export const parentApi = {
 };
 
 /**
+ * Story theme API calls
+ */
+export const themeApi = {
+  getAll: async (): Promise<ApiResponse<StoryThemes>> => {
+    const res = await apiCall<{ message?: string; data?: StoryThemes }>(
+      API_CONFIG.ENDPOINTS.THEMES.GET_ALL,
+      {
+        method: "GET",
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const body = res.data;
+    if (body?.data && Array.isArray(body.data.finance) && Array.isArray(body.data.story)) {
+      return { success: true, data: body.data };
+    }
+
+    return {
+      success: false,
+      error: "Invalid themes response.",
+    };
+  },
+};
+
+/**
  * Children API calls
  */
 export const childrenApi = {
   register: async (username: string, pin: string, parentId?: string) => {
+    const payload = parentId ? { name: username, pin, parentId } : { name: username, pin };
+
     return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.REGISTER, {
       method: "POST",
       credentials: "include",
@@ -203,7 +243,7 @@ export const childrenApi = {
         ...authHeaders(),
       },
       // backend expects `name` field
-      body: JSON.stringify({ name: username, pin }),
+      body: JSON.stringify(payload),
     });
   },
 
@@ -230,9 +270,9 @@ export const childrenApi = {
 
     if (!res.success) return { success: false, error: res.error };
 
-    const body = res.data as any;
+    const body = res.data;
     if (body && Array.isArray(body.data)) {
-      return { success: true, data: body.data as ChildProfile[] };
+      return { success: true, data: body.data };
     }
 
     // Fallback: if API already returned a raw array of child objects
