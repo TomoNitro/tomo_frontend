@@ -12,6 +12,16 @@ import {
 } from "@/lib/validation";
 
 type SceneTone = "wave" | "register" | "login";
+type RegisterResponseData = {
+  user?: {
+    username?: unknown;
+    email?: unknown;
+  };
+  data?: {
+    username?: unknown;
+    email?: unknown;
+  };
+};
 
 function FieldIcon({ kind }: { kind: "user" | "mail" | "lock" }) {
   if (kind === "user") {
@@ -59,7 +69,7 @@ function SmallMascot({ tone }: { tone: SceneTone }) {
     <div className="relative flex min-h-[22rem] w-full items-center justify-center lg:min-h-[30rem]">
       <div className="absolute left-1/2 top-1/2 h-[19rem] w-[19rem] -translate-x-1/2 -translate-y-[42%] rounded-full bg-[#ffe071]/55 blur-3xl" />
 
-      <div className="relative h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] flex items-center justify-center">
+      <div className="relative flex h-[20rem] w-[16rem] items-center justify-center sm:h-[22rem] sm:w-[18rem]">
         <picture>
           <source srcSet={`/images/${imageName}.png`} type="image/png" />
           <img src={`/images/${imageName}.png`} alt={`Tomo mascot ${imageName}`} className="h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] object-contain" />
@@ -141,13 +151,14 @@ function CardShell({ children }: { children: ReactNode }) {
   );
 }
 
-function PrimaryAction({ children }: { children: ReactNode }) {
+function PrimaryAction({ children, isLoading }: { children: ReactNode; isLoading?: boolean }) {
   return (
     <button
       type="submit"
-      className="inline-flex h-16 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#f59f1b] to-[#ff8128] px-8 text-[1.06rem] font-black text-white shadow-[0_18px_32px_rgba(243,133,28,0.26)] transition-transform duration-200 hover:-translate-y-0.5"
+      disabled={isLoading}
+      className="inline-flex h-16 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#f59f1b] to-[#ff8128] px-8 text-[1.06rem] font-black text-white shadow-[0_18px_32px_rgba(243,133,28,0.26)] transition-transform duration-200 hover:enabled:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
     >
-      {children}
+      {isLoading ? "SENDING..." : children}
     </button>
   );
 }
@@ -163,36 +174,33 @@ export function RegisterForm() {
 
   const handleUsernameChange = (value: string) => {
     setUsername(value);
-    const error = validateUsername(value);
     setErrors((prev) => ({
       ...prev,
-      username: error || "",
+      username: validateUsername(value) || "",
     }));
   };
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
-    const error = validateEmail(value);
     setErrors((prev) => ({
       ...prev,
-      email: error || "",
+      email: validateEmail(value) || "",
     }));
   };
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
-    const error = validatePassword(value);
     setErrors((prev) => ({
       ...prev,
-      password: error || "",
+      password: validatePassword(value) || "",
     }));
   };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatusMessage("");
+    setIsSubmitting(true);
 
-    // Validate all fields
     const validation = validateRegistration(username, email, password);
     if (!validation.isValid) {
       const errorMap: { [key: string]: string } = {};
@@ -201,15 +209,27 @@ export function RegisterForm() {
       });
       setErrors(errorMap);
       setStatusMessage("Harap periksa kembali form Anda");
+      setIsSubmitting(false);
       return;
     }
 
-    setIsSubmitting(true);
     const response = await authApi.register(username, email, password);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Registration failed.");
+      setStatusMessage(response.error ?? "Akun belum bisa dibuat. Silakan coba lagi.");
     } else {
+      const responseData = response.data as RegisterResponseData | undefined;
+      const sender = responseData?.user ?? responseData?.data ?? {};
+      const savedName = typeof sender.username === "string" ? sender.username.trim() : username;
+      const savedEmail = typeof sender.email === "string" ? sender.email.trim() : email;
+
+      window.localStorage.setItem("tomoParentName", savedName);
+      window.localStorage.setItem("tomoParentEmail", savedEmail);
+      window.localStorage.setItem(
+        "tomoParentProfile",
+        JSON.stringify({ name: savedName, email: savedEmail })
+      );
+
       setStatusMessage("Registration sent successfully.");
       setUsername("");
       setEmail("");
@@ -261,9 +281,7 @@ export function RegisterForm() {
           </div>
 
           <div className="mt-8">
-            <PrimaryAction>
-              {isSubmitting ? "SENDING..." : "LET'S GO!"}
-            </PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>{"LET'S GO!"}</PrimaryAction>
           </div>
 
           {statusMessage ? (
@@ -285,6 +303,7 @@ export function RegisterForm() {
 }
 
 export function LoginForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
@@ -299,34 +318,43 @@ export function LoginForm() {
     }));
   };
 
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    setErrors((prev) => ({
+      ...prev,
+      password: validatePassword(value) || "",
+    }));
+  };
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatusMessage("");
+    setIsSubmitting(true);
+
     const emailError = validateEmail(email);
-    const passwordError = password ? null : "Password tidak boleh kosong";
+    const passwordError = validatePassword(password);
 
     if (emailError || passwordError) {
       setErrors({
         email: emailError || "",
         password: passwordError || "",
       });
-      setStatusMessage("Harap periksa kembali email dan password Anda");
+      setStatusMessage("Harap periksa kembali form Anda");
+      setIsSubmitting(false);
       return;
     }
 
-    setIsSubmitting(true);
     setErrors({});
-
     const response = await authApi.login(email, password);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Login failed.");
+      setErrors({
+        password: "Email atau password belum sesuai.",
+      });
+      setStatusMessage(response.error ?? "Email atau password belum sesuai.");
     } else {
-      setStatusMessage("Login successful!");
-      // Redirect ke profile picker setelah 1 detik
-      setTimeout(() => {
-        window.location.href = "/profile";
-      }, 1000);
+      setStatusMessage("Login successful.");
+      router.push("/profile");
     }
 
     setIsSubmitting(false);
@@ -358,21 +386,13 @@ export function LoginForm() {
               placeholder="••••••••"
               type="password"
               value={password}
-              onChange={(value) => {
-                setPassword(value);
-                setErrors((prev) => ({
-                  ...prev,
-                  password: value ? "" : "Password tidak boleh kosong",
-                }));
-              }}
+              onChange={handlePasswordChange}
               error={errors.password}
             />
           </div>
 
           <div className="mt-10">
-            <PrimaryAction>
-              {isSubmitting ? "LOGGING IN..." : "LET'S GO!"}
-            </PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>{"LET'S GO!"}</PrimaryAction>
           </div>
 
           {statusMessage ? (

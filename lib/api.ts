@@ -128,7 +128,7 @@ async function apiCall<T>(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || `HTTP ${response.status}: ${response.statusText}`,
+        error: getFriendlyApiError(response.status, data),
       };
     }
 
@@ -139,7 +139,7 @@ async function apiCall<T>(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
+      error: getFriendlyNetworkError(error),
     };
   }
 }
@@ -154,7 +154,10 @@ export const authApi = {
       credentials: "include",
       body: JSON.stringify({ username, email, password }),
     });
-    if (res.success) storeTokenFromResponse(res.data);
+    if (res.success) {
+      storeTokenFromResponse(res.data);
+      storeParentProfileFromResponse(res.data);
+    }
     return res;
   },
 
@@ -164,7 +167,10 @@ export const authApi = {
       credentials: "include",
       body: JSON.stringify({ email, password }),
     });
-    if (res.success) storeTokenFromResponse(res.data);
+    if (res.success) {
+      storeTokenFromResponse(res.data);
+      storeParentProfileFromResponse(res.data);
+    }
     return res;
   },
 
@@ -188,7 +194,26 @@ export const userApi = {
   updateProfile: async (userData: Record<string, unknown>) => {
     return apiCall(API_CONFIG.ENDPOINTS.USER.UPDATE, {
       method: "PUT",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
       body: JSON.stringify(userData),
+    });
+  },
+};
+
+/**
+ * Parent API calls
+ */
+export const parentApi = {
+  getInfo: async () => {
+    return apiCall(API_CONFIG.ENDPOINTS.PARENT.INFO, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
     });
   },
 };

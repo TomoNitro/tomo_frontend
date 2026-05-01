@@ -12,6 +12,8 @@ interface ChildrenPickerProps {
   onChildSelect: (child: ChildProfile | "parent") => void;
   onAddChild?: (username: string, pin: string) => void;
   isLoadingChildren?: boolean;
+  defaultMode?: Mode;
+  onClose?: () => void;
 }
 
 function InputFieldSmall({
@@ -180,8 +182,10 @@ export function ChildrenPickerModal({
   childProfiles = [],
   onChildSelect,
   onAddChild,
+  defaultMode = "picker",
+  onClose,
 }: ChildrenPickerProps) {
-  const [mode, setMode] = useState<Mode>("picker");
+  const [mode, setMode] = useState<Mode>(defaultMode);
   const [childUsername, setChildUsername] = useState("");
   const [childPin, setChildPin] = useState("");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -197,6 +201,11 @@ export function ChildrenPickerModal({
   };
 
   const handleBack = () => {
+    if (onClose) {
+      onClose();
+      return;
+    }
+
     setMode("picker");
     setChildUsername("");
     setChildPin("");
@@ -231,7 +240,7 @@ export function ChildrenPickerModal({
     const response = await childrenApi.register(childUsername, childPin);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Gagal menambah anak");
+      setStatusMessage(response.error ?? "Profil anak belum bisa ditambahkan. Silakan coba lagi.");
     } else {
       setStatusMessage("Anak berhasil ditambahkan!");
       onAddChild?.(childUsername, childPin);

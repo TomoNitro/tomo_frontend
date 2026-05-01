@@ -150,13 +150,14 @@ export default function ChildLoginPage() {
     const response = await childrenApi.login(childId, pin);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Login failed.");
+      setErrors({
+        pin: "PIN belum sesuai. Coba masukkan lagi ya.",
+      });
+      setStatusMessage(response.error ?? "PIN belum sesuai. Coba masukkan lagi ya.");
     } else {
       setStatusMessage("Login successful!");
       localStorage.setItem("selectedUser", childName);
-      setTimeout(() => {
-        router.push("/child/dashboard");
-      }, 1000);
+      router.push("/child/dashboard");
     }
 
     setIsSubmitting(false);
@@ -222,7 +223,7 @@ export default function ChildLoginPage() {
 
                 <div className="mt-8">
                   <PrimaryAction isLoading={isSubmitting}>
-                    LET'S GO!
+                    LET&apos;S GO!
                   </PrimaryAction>
                 </div>
 
