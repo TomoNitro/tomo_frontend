@@ -201,6 +201,43 @@ function extractArray(data: unknown): unknown[] {
   return [];
 }
 
+function getFriendlyApiError(status: number, data: unknown): string {
+  const message =
+    data && typeof data === "object"
+      ? String(
+          (data as { error?: unknown; message?: unknown }).error ||
+            (data as { error?: unknown; message?: unknown }).message ||
+            ""
+        )
+      : "";
+  const normalized = message.toLowerCase();
+
+  if (
+    status === 400 &&
+    (normalized.includes("pin") ||
+      normalized.includes("password") ||
+      normalized.includes("invalid") )
+  ) {
+    return message || "Invalid request data.";
+  }
+
+  if (status === 401) return "Unauthorized. Please login again.";
+  if (status === 403) return "Access denied.";
+  if (status === 404) return message || "Resource not found.";
+  if (status >= 500) return "Server error. Please try again later.";
+
+  return message || `HTTP ${status}`;
+}
+
+function getFriendlyNetworkError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  try {
+    return String(error);
+  } catch {
+    return "Network error";
+  }
+}
+
 /**
  * Generic fetch wrapper for API calls
  */
