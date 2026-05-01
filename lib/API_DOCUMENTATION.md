@@ -55,10 +55,14 @@ if (response.success) {
 
 // Login
 <<<<<<< HEAD
+<<<<<<< HEAD
 const response = await authApi.login(email, password);
 =======
 const response = await authApi.login(username, password);
 >>>>>>> a6330a6 (Refactor code structure for improved readability and maintainability)
+=======
+const response = await authApi.login(email, password);
+>>>>>>> c002402 (feat: update login functionality to use email instead of username)
 
 // Logout
 const response = await authApi.logout();
