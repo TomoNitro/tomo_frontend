@@ -285,17 +285,39 @@ export function RegisterForm() {
 }
 
 export function LoginForm() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    setErrors((prev) => ({
+      ...prev,
+      email: validateEmail(value) || "",
+    }));
+  };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
     setStatusMessage("");
+    const emailError = validateEmail(email);
+    const passwordError = password ? null : "Password tidak boleh kosong";
 
-    const response = await authApi.login(username, password);
+    if (emailError || passwordError) {
+      setErrors({
+        email: emailError || "",
+        password: passwordError || "",
+      });
+      setStatusMessage("Harap periksa kembali email dan password Anda");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrors({});
+
+    const response = await authApi.login(email, password);
 
     if (!response.success) {
       setStatusMessage(response.error ?? "Login failed.");
@@ -323,11 +345,12 @@ export function LoginForm() {
 
           <div className="mt-8 space-y-5">
             <InputField
-              label="Username"
-              icon="user"
-              placeholder="username"
-              value={username}
-              onChange={setUsername}
+              label="Email"
+              icon="mail"
+              placeholder="parent@email.com"
+              value={email}
+              onChange={handleEmailChange}
+              error={errors.email}
             />
             <InputField
               label="Password"
@@ -335,7 +358,14 @@ export function LoginForm() {
               placeholder="••••••••"
               type="password"
               value={password}
-              onChange={setPassword}
+              onChange={(value) => {
+                setPassword(value);
+                setErrors((prev) => ({
+                  ...prev,
+                  password: value ? "" : "Password tidak boleh kosong",
+                }));
+              }}
+              error={errors.password}
             />
           </div>
 

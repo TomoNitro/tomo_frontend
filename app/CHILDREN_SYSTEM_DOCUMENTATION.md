@@ -17,7 +17,7 @@ Sistem ini memungkinkan parent untuk membuat akun untuk anak-anak mereka. Setiap
 ### 2. Parent Login
 ```
 /auth/login
-  → Fill: username, password
+  → Fill: email, password
   → Submit → /api/user/login
   → Success → Redirect ke /profile (Profile Picker)
 ```
