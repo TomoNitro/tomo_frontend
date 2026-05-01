@@ -213,7 +213,7 @@ export function RegisterForm() {
 
           <div className="mt-8">
             <PrimaryAction>
-              {isSubmitting ? "SENDING..." : "LET'S GO! ⛵"}
+              {isSubmitting ? "SENDING..." : "LET'S GO!"}
             </PrimaryAction>
           </div>
 
