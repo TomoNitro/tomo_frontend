@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 type SceneTone = "wave" | "register" | "login";
@@ -137,6 +138,7 @@ function PrimaryAction({ children }: { children: ReactNode }) {
 }
 
 export function RegisterForm() {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -165,6 +167,7 @@ export function RegisterForm() {
       }
 
       setStatusMessage(data.message ?? "Registration sent successfully.");
+      router.push("/parent/dashboard");
     } catch {
       setStatusMessage("Unable to reach the register API.");
     } finally {
@@ -233,40 +236,88 @@ export function RegisterForm() {
 }
 
 export function LoginForm() {
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatusMessage("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/user/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        setStatusMessage(data.error ?? "Login failed.");
+        return;
+      }
+
+      setStatusMessage(data.message ?? "Login successful.");
+      router.push("/parent/dashboard");
+    } catch {
+      setStatusMessage("Unable to reach the login API.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <CardShell>
       <div className="relative z-10">
-        <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
-          Expedition Login
-        </h1>
-        <p className="mt-3 text-[1.05rem] font-medium text-[#6b5649]">
-          Ready to continue your journey?
-        </p>
+        <form onSubmit={handleSubmit}>
+          <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
+            Expedition Login
+          </h1>
+          <p className="mt-3 text-[1.05rem] font-medium text-[#6b5649]">
+            Ready to continue your journey?
+          </p>
 
-        <div className="mt-8 space-y-5">
-          <InputField
-            label="Username"
-            icon="user"
-            placeholder="username"
-          />
-          <InputField
-            label="Password"
-            icon="lock"
-            placeholder="••••••••"
-            type="password"
-          />
-        </div>
+          <div className="mt-8 space-y-5">
+            <InputField
+              label="Username"
+              icon="user"
+              placeholder="username"
+              value={username}
+              onChange={setUsername}
+            />
+            <InputField
+              label="Password"
+              icon="lock"
+              placeholder="••••••••"
+              type="password"
+              value={password}
+              onChange={setPassword}
+            />
+          </div>
 
-        <div className="mt-10">
-          <PrimaryAction>LET'S GO! 🚀</PrimaryAction>
-        </div>
+          <div className="mt-10">
+            <PrimaryAction>{isSubmitting ? "SENDING..." : "LET'S GO!"}</PrimaryAction>
+          </div>
 
-        <p className="mt-7 text-center text-[0.95rem] font-semibold text-[#6f5a4d]">
-          New to the team?{" "}
-          <Link href="/auth/register" className="font-black text-[#f39211]">
-            Join the Expedition
-          </Link>
-        </p>
+          {statusMessage ? (
+            <p className="mt-4 text-center text-[0.92rem] font-semibold text-[#8b5a18]">
+              {statusMessage}
+            </p>
+          ) : null}
+
+          <p className="mt-7 text-center text-[0.95rem] font-semibold text-[#6f5a4d]">
+            New to the team?{" "}
+            <Link href="/auth/register" className="font-black text-[#f39211]">
+              Join the Expedition
+            </Link>
+          </p>
+        </form>
       </div>
     </CardShell>
   );
@@ -294,32 +345,20 @@ export function ProfilePicker() {
     <main className="min-h-screen px-6 py-14 sm:px-10 lg:px-14">
       <section className="mx-auto flex min-h-[calc(100vh-7rem)] max-w-7xl flex-col items-center justify-center text-center">
         <h1 className="max-w-3xl text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl lg:text-6xl">
-          Who is exploring today?
+          Parent Mode Active
         </h1>
         <p className="mt-4 max-w-2xl text-lg font-medium leading-8 text-[#5f4d42] sm:text-[1.15rem]">
-          Select your user to continue your adventure with Tomo.
+          Story generation and dashboard are now focused on parent only.
         </p>
 
-        <div className="mt-14 grid w-full max-w-5xl grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-12">
+        <div className="mt-14 grid w-full max-w-md grid-cols-1 gap-10">
           <div className="flex flex-col items-center gap-5">
-            <Avatar label="Parent" small />
-          </div>
-          <div className="flex flex-col items-center gap-5">
-            <Avatar label="Leo" small />
-          </div>
-          <div className="flex flex-col items-center gap-5">
-            <Avatar label="Maya" small />
-          </div>
-          <div className="flex flex-col items-center gap-5">
-            <button
-              type="button"
-              className="relative flex h-32 w-32 items-center justify-center rounded-full border-4 border-dashed border-[#dcc4ac] bg-[#f3e5d2] text-[#8f7b69] shadow-[0_16px_28px_rgba(132,105,70,0.08)] transition-transform duration-200 hover:-translate-y-0.5"
-            >
-              <span className="text-6xl font-light leading-none">+</span>
-            </button>
-            <span className="text-[1.05rem] font-black text-[#8d7661]">
-              Add Explorer
-            </span>
+            <Link href="/parent/dashboard" className="group flex flex-col items-center gap-5">
+              <Avatar label="Parent" small />
+              <span className="rounded-full bg-gradient-to-r from-[#f59f1b] to-[#ff8128] px-6 py-3 text-[1rem] font-black text-white shadow-[0_12px_22px_rgba(243,133,28,0.28)] transition-transform group-hover:-translate-y-0.5">
+                Go to Parent Dashboard
+              </span>
+            </Link>
           </div>
         </div>
       </section>
