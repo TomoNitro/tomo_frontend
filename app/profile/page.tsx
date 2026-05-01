@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { childrenApi } from "@/lib/api";
+import { childrenApi, type ChildProfile } from "@/lib/api";
 import { ChildrenPickerModal } from "@/app/auth/_components/children-picker";
 
 export default function ProfilePickerPage() {
   const router = useRouter();
-  const [children, setChildren] = useState<string[]>([]);
+  const [children, setChildren] = useState<ChildProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -22,26 +22,23 @@ export default function ProfilePickerPage() {
     loadChildren();
   }, []);
 
-  const handleChildSelect = (childName: string) => {
+  const handleChildSelect = (child: ChildProfile | "parent") => {
     // Store selected user in localStorage or session
-    if (childName === "parent") {
+    if (child === "parent") {
       localStorage.setItem("selectedUser", "parent");
       router.push("/parent/dashboard");
     } else {
-      localStorage.setItem("selectedUser", childName);
+      localStorage.setItem("selectedUser", child.name);
+      localStorage.setItem("selectedChildId", child.id);
+      localStorage.setItem("selectedChildName", child.name);
       router.push("/child/login");
     }
-  };
-
-  const handleAddChild = (username: string, _pin: string) => {
-    setChildren((prev) => [...prev, username]);
   };
 
   return (
     <ChildrenPickerModal
       children={children}
       onChildSelect={handleChildSelect}
-      onAddChild={handleAddChild}
       isLoadingChildren={isLoading}
     />
   );

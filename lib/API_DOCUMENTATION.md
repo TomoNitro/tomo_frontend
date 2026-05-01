@@ -72,6 +72,21 @@ const response = await userApi.getProfile();
 const response = await userApi.updateProfile({ name: "John" });
 ```
 
+### Children API
+
+```typescript
+import { childrenApi } from "@/lib/api";
+
+// Register child profile
+const registerResponse = await childrenApi.register("leo_kid", "1234");
+
+// Login child profile after selecting it in /profile
+const loginResponse = await childrenApi.login("child-uuid", "1234");
+
+// Fetch children list for the profile picker
+const listResponse = await childrenApi.getList();
+```
+
 ## Response Format
 
 Semua API calls mengembalikan struktur yang sama:

@@ -20,7 +20,7 @@ export const API_CONFIG = {
     CHILDREN: {
       REGISTER: "/api/children/register",
       LOGIN: "/api/children/login",
-      GET_LIST: "/api/children/list",
+      GET_LIST: "/api/children",
     },
   },
 };

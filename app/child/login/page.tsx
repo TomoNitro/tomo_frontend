@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { childrenApi } from "@/lib/api";
@@ -90,7 +90,8 @@ function PrimaryAction({ children, isLoading }: { children: React.ReactNode; isL
 
 export default function ChildLoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [childName, setChildName] = useState("");
+  const [childId, setChildId] = useState("");
   const [pin, setPin] = useState("");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [statusMessage, setStatusMessage] = useState("");
@@ -105,6 +106,23 @@ export default function ChildLoginPage() {
     }));
   };
 
+  useEffect(() => {
+    // Read selected child set by Profile picker
+    try {
+      const storedChildName = localStorage.getItem("selectedChildName") || localStorage.getItem("selectedUser") || "";
+      const storedChildId = localStorage.getItem("selectedChildId") || "";
+      if (!storedChildName || !storedChildId) {
+        // If no child selected, go back to profile
+        router.push("/profile");
+        return;
+      }
+      setChildName(storedChildName);
+      setChildId(storedChildId);
+    } catch (e) {
+      // ignore
+    }
+  }, [router]);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatusMessage("");
@@ -112,9 +130,8 @@ export default function ChildLoginPage() {
 
     // Validate
     const pinError = validatePin(pin);
-    if (!username.trim() || pinError) {
+    if (pinError) {
       setErrors({
-        username: !username.trim() ? "Username tidak boleh kosong" : "",
         pin: pinError || "",
       });
       setStatusMessage("Harap periksa kembali form Anda");
@@ -122,13 +139,19 @@ export default function ChildLoginPage() {
       return;
     }
 
-    const response = await childrenApi.login(username, pin);
+    if (!childId) {
+      setStatusMessage("Profile child tidak valid. Pilih profile lagi.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const response = await childrenApi.login(childId, pin);
 
     if (!response.success) {
       setStatusMessage(response.error ?? "Login failed.");
     } else {
       setStatusMessage("Login successful!");
-      localStorage.setItem("selectedUser", username);
+      localStorage.setItem("selectedUser", childName);
       setTimeout(() => {
         router.push("/child/dashboard");
       }, 1000);
@@ -169,29 +192,23 @@ export default function ChildLoginPage() {
             <div className="relative z-10">
               <form onSubmit={handleSubmit}>
                 <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
-                  Explorer Login
+                  Who's watching?
                 </h1>
                 <p className="mt-3 text-[1.05rem] font-medium text-[#6b5649]">
-                  Enter your details to begin.
+                  Enter your PIN to continue.
                 </p>
 
                 <div className="mt-8 space-y-5">
+                  <div>
+                    <label className="mb-2 block text-[0.84rem] font-black uppercase tracking-[0.26em] text-[#8f6519]">
+                      Profile
+                    </label>
+                    <div className="h-14 w-full rounded-full border bg-[#fffefc] px-5 py-3 text-[1rem] font-black text-[#53443b]">
+                      {childName}
+                    </div>
+                  </div>
                   <InputField
-                    label="Username"
-                    icon="user"
-                    placeholder="username"
-                    value={username}
-                    onChange={(value) => {
-                      setUsername(value);
-                      setErrors((prev) => ({
-                        ...prev,
-                        username: "",
-                      }));
-                    }}
-                    error={errors.username}
-                  />
-                  <InputField
-                    label="PIN"
+                    label={`PIN`}
                     icon="lock"
                     placeholder="••••"
                     type="password"

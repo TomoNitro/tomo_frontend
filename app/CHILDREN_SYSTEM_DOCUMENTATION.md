@@ -2,7 +2,7 @@
 
 ## Overview
 
-Sistem ini memungkinkan parent untuk membuat akun untuk anak-anak mereka. Setiap anak hanya perlu username dan PIN untuk login.
+Sistem ini memungkinkan parent untuk membuat akun untuk anak-anak mereka. Setelah memilih profile, anak hanya perlu PIN untuk login, dan login request memakai child ID.
 
 ## User Flow
 
@@ -25,7 +25,7 @@ Sistem ini memungkinkan parent untuk membuat akun untuk anak-anak mereka. Setiap
 ### 3. Profile Picker (After Login/Register)
 ```
 /profile (Page utama setelah login)
-  → Tampil: Parent + Semua anak-anak + Add Explorer button
+  → Tampil: Parent + Semua anak-anak + Add Profile button
   
   Jika click "Parent":
     → Redirect ke /parent/dashboard
@@ -35,7 +35,7 @@ Sistem ini memungkinkan parent untuk membuat akun untuk anak-anak mereka. Setiap
   
   Jika click "Add Explorer" (+):
     → Modal membuka: Add Child Form
-    → Fill: username anak, PIN anak (4-6 digit)
+    → Fill: name anak, PIN anak (4-6 digit)
     → Submit → /api/children/register
     → Success → Anak ditambahkan ke list
 ```
@@ -43,7 +43,8 @@ Sistem ini memungkinkan parent untuk membuat akun untuk anak-anak mereka. Setiap
 ### 4. Child Login
 ```
 /child/login
-  → Fill: username anak, PIN
+  → Profile dipilih dari list
+  → Fill: PIN
   → Submit → /api/children/login
   → Success → Redirect ke /child/dashboard
 ```
@@ -90,34 +91,34 @@ Menampilkan 2 mode:
 #### Mode 1: Picker (Profile Selection)
 ```
 ┌─────────────────────────────────────┐
-│  Who is exploring today?            │
+│  Who's watching?                    │
 │                                     │
 │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
 │  │Parent│ │ Leo  │ │ Maya │ │ +    │
 │  └──────┘ └──────┘ └──────┘ └──────┘
-│  Parent    Leo     Maya    Add Explorer
+│  Parent    Leo     Maya    Add Profile
 └─────────────────────────────────────┘
 ```
 
 Props:
 - `children: string[]` - List nama-nama anak
 - `onChildSelect: (name) => void` - Callback saat memilih user
-- `onAddChild: (username, pin) => void` - Callback saat anak ditambahkan
+- `onAddChild: (name, pin) => void` - Callback saat anak ditambahkan
 - `isLoadingChildren?: boolean` - Loading state
 
 #### Mode 2: Add Child Form
 ```
 ┌──────────────────────────────────┐
-│  Add Explorer                    │
+│  Add Profile                     │
 │  Buat akun untuk anak Anda       │
 │                                  │
-│  Child Username:                 │
+│  Child Name:                     │
 │  [________________]              │
 │                                  │
 │  Child PIN:                      │
 │  [________________]              │
 │                                  │
-│  [ADD EXPLORER] [CANCEL]         │
+│  [ADD PROFILE] [CANCEL]          │
 └──────────────────────────────────┘
 ```
 
@@ -143,11 +144,12 @@ const handleChildSelect = (childName: string) => {
 ### Child Login Page ([app/child/login/page.tsx](app/child/login/page.tsx))
 
 Form untuk anak login dengan:
-- Username input
+- Profile yang sudah dipilih dari `/profile`
 - PIN input (password field, 4-6 digit)
 - Validation real-time
 - Error messages
 - Redirect ke `/child/dashboard` setelah sukses
+- Request login mengirim `childId + pin`
 
 ## Validation Rules
 
@@ -177,7 +179,7 @@ if (response.success) {
 
 ### Login as Child
 ```typescript
-const response = await childrenApi.login("leo_kid", "1234");
+const response = await childrenApi.login("child-uuid", "1234");
 if (response.success) {
   // Store user info, redirect to dashboard
 } else {
