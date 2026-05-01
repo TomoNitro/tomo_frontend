@@ -6,6 +6,22 @@ import Link from "next/link";
 import { childrenApi } from "@/lib/api";
 import { validatePin } from "@/lib/validation";
 
+function FieldIcon({ kind }: { kind: "user" | "lock" }) {
+  if (kind === "user") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
+        <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm-7 9a7 7 0 0 1 14 0H5Z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
+      <path d="M7 10V8a5 5 0 0 1 10 0v2h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1Zm2 0h6V8a3 3 0 0 0-6 0v2Zm1 4a2 2 0 1 1 4 0c0 .8-.5 1.5-1.1 1.8V18h-1.8v-2.2A2 2 0 0 1 10 14Z" />
+    </svg>
+  );
+}
+
 function InputField({
   label,
   icon,
@@ -23,22 +39,6 @@ function InputField({
   onChange?: (value: string) => void;
   error?: string;
 }) {
-  function FieldIcon({ kind }: { kind: "user" | "lock" }) {
-    if (kind === "user") {
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
-          <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm-7 9a7 7 0 0 1 14 0H5Z" />
-        </svg>
-      );
-    }
-
-    return (
-      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
-        <path d="M7 10V8a5 5 0 0 1 10 0v2h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1Zm2 0h6V8a3 3 0 0 0-6 0v2Zm1 4a2 2 0 1 1 4 0c0 .8-.5 1.5-1.1 1.8V18h-1.8v-2.2A2 2 0 0 1 10 14Z" />
-      </svg>
-    );
-  }
-
   return (
     <label className="block">
       <span className="mb-2 inline-flex items-center gap-2 text-[0.84rem] font-black uppercase tracking-[0.26em] text-[#8f6519]">
@@ -116,9 +116,11 @@ export default function ChildLoginPage() {
         router.push("/profile");
         return;
       }
-      setChildName(storedChildName);
-      setChildId(storedChildId);
-    } catch (e) {
+      queueMicrotask(() => {
+        setChildName(storedChildName);
+        setChildId(storedChildId);
+      });
+    } catch {
       // ignore
     }
   }, [router]);
@@ -180,7 +182,7 @@ export default function ChildLoginPage() {
 
             <div className="absolute left-1/2 top-[6%] w-[15rem] -translate-x-1/2 rounded-[20px] bg-white px-6 py-5 text-center shadow-[0_18px_32px_rgba(127,91,45,0.12)] sm:left-[18%] sm:translate-x-0">
               <p className="text-[0.95rem] font-black leading-6 text-[#31291f]">
-                "Ready for adventure?"
+                &quot;Ready for adventure?&quot;
               </p>
               <div className="absolute bottom-[-10px] left-[38%] h-5 w-5 rotate-45 bg-white" />
             </div>
@@ -191,8 +193,8 @@ export default function ChildLoginPage() {
           <CardShell>
             <div className="relative z-10">
               <form onSubmit={handleSubmit}>
-                <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
-                  Who's watching?
+                  <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
+                  Who&apos;s watching?
                 </h1>
                 <p className="mt-3 text-[1.05rem] font-medium text-[#6b5649]">
                   Enter your PIN to continue.
@@ -220,7 +222,7 @@ export default function ChildLoginPage() {
 
                 <div className="mt-8">
                   <PrimaryAction isLoading={isSubmitting}>
-                    LET'S GO!
+                    LET&apos;S GO!
                   </PrimaryAction>
                 </div>
 

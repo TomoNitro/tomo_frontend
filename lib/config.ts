@@ -21,6 +21,8 @@ export const API_CONFIG = {
       REGISTER: "/api/children/register",
       LOGIN: "/api/children/login",
       GET_LIST: "/api/children",
+      MARKETS: "/api/children/markets",
+      COINS: "/api/children/coins",
     },
   },
 };

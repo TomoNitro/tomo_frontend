@@ -17,11 +17,21 @@ export interface ChildProfile {
   created_at?: string;
 }
 
+export interface MarketItem {
+  id: string;
+  title: string;
+  image_url: string;
+  price: number;
+  created_at?: string;
+}
+
 const AUTH_TOKEN_KEY = "tomoAuthToken";
+const CHILD_AUTH_TOKEN_KEY = "tomoChildAuthToken";
+const AUTH_TOKEN_FALLBACK_KEYS = ["accessToken", "token"];
 
 function extractToken(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
-  const d = data as Record<string, any>;
+  const d = data as Record<string, unknown>;
   if (typeof d.accessToken === "string") return d.accessToken;
   if (typeof d.token === "string") return d.token;
   if (typeof d.jwt === "string") return d.jwt;
@@ -37,17 +47,52 @@ function extractToken(data: unknown): string | null {
 function storeTokenFromResponse(data: unknown) {
   if (typeof window === "undefined") return;
   const t = extractToken(data);
-  if (t) window.localStorage.setItem(AUTH_TOKEN_KEY, t);
+  if (t) {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, t);
+    window.localStorage.setItem("accessToken", t);
+  }
 }
 
-function getStoredToken(): string | null {
+function storeChildTokenFromResponse(data: unknown) {
+  if (typeof window === "undefined") return;
+  const t = extractToken(data);
+  if (t) {
+    window.localStorage.setItem(CHILD_AUTH_TOKEN_KEY, t);
+    window.localStorage.setItem("childAccessToken", t);
+  }
+}
+
+function clearChildToken() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(CHILD_AUTH_TOKEN_KEY);
+  window.localStorage.removeItem("childAccessToken");
+}
+
+function getStoredToken(extraKeys: string[] = []): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+  return (
+    [AUTH_TOKEN_KEY, ...extraKeys, ...AUTH_TOKEN_FALLBACK_KEYS]
+      .map((key) => window.localStorage.getItem(key))
+      .find(Boolean) ||
+    null
+  );
 }
 
 function authHeaders(): Record<string, string> {
   const t = getStoredToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+function childAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const t =
+    window.localStorage.getItem(CHILD_AUTH_TOKEN_KEY) ||
+    window.localStorage.getItem("childAccessToken");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+function hasChildToken(): boolean {
+  return Boolean(childAuthHeaders().Authorization);
 }
 
 /**
@@ -142,7 +187,7 @@ export const userApi = {
  * Children API calls
  */
 export const childrenApi = {
-  register: async (username: string, pin: string, parentId?: string) => {
+  register: async (username: string, pin: string) => {
     return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.REGISTER, {
       method: "POST",
       credentials: "include",
@@ -155,11 +200,16 @@ export const childrenApi = {
   },
 
   login: async (childId: string, pin: string) => {
-    return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.LOGIN, {
+    const res = await apiCall(API_CONFIG.ENDPOINTS.CHILDREN.LOGIN, {
       method: "POST",
       credentials: "include",
       body: JSON.stringify({ childId, pin }),
     });
+    if (res.success) {
+      clearChildToken();
+      storeChildTokenFromResponse(res.data);
+    }
+    return res;
   },
 
   getList: async (parentId?: string): Promise<ApiResponse<ChildProfile[]>> => {
@@ -177,7 +227,7 @@ export const childrenApi = {
 
     if (!res.success) return { success: false, error: res.error };
 
-    const body = res.data as any;
+    const body = res.data as { data?: unknown };
     if (body && Array.isArray(body.data)) {
       return { success: true, data: body.data as ChildProfile[] };
     }
@@ -189,4 +239,67 @@ export const childrenApi = {
 
     return { success: true, data: [] };
   },
+
+  getMarkets: async (): Promise<ApiResponse<MarketItem[]>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const res = await apiCall<{ message?: string; data?: MarketItem[] }>(
+      API_CONFIG.ENDPOINTS.CHILDREN.MARKETS,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const body = res.data as { data?: unknown };
+    if (Array.isArray(body?.data)) {
+      return { success: true, data: body.data as MarketItem[] };
+    }
+
+    if (Array.isArray(res.data)) {
+      return { success: true, data: res.data as MarketItem[] };
+    }
+
+    return { success: true, data: [] };
+  },
+
+  getCoins: async (): Promise<ApiResponse<number>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const res = await apiCall<{ message?: string; data?: { amount?: number } }>(
+      API_CONFIG.ENDPOINTS.CHILDREN.COINS,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const body = res.data as { data?: { amount?: unknown } };
+    if (typeof body?.data?.amount === "number") {
+      return { success: true, data: body.data.amount };
+    }
+
+    return { success: true, data: 0 };
+  },
+
 };
