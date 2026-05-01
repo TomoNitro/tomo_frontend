@@ -2,6 +2,13 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { authApi } from "@/lib/api";
+import {
+  validateUsername,
+  validateEmail,
+  validatePassword,
+  validateRegistration,
+} from "@/lib/validation";
 
 type SceneTone = "wave" | "register" | "login";
 
@@ -78,6 +85,7 @@ function InputField({
   helper,
   value,
   onChange,
+  error,
 }: {
   label: string;
   icon: "user" | "mail" | "lock";
@@ -86,6 +94,7 @@ function InputField({
   helper?: string;
   value?: string;
   onChange?: (value: string) => void;
+  error?: string;
 }) {
   return (
     <label className="block">
@@ -101,7 +110,11 @@ function InputField({
           placeholder={placeholder}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
-          className="h-14 w-full rounded-full border border-[#a9a2a2] bg-[#f9efdb] px-5 text-[1rem] font-semibold text-[#53443b] outline-none transition focus:border-[#f0a22b] focus:bg-white focus:ring-4 focus:ring-[#f0a22b]/14 placeholder:text-[#c7bdb0]"
+          className={`h-14 w-full rounded-full border bg-[#f9efdb] px-5 text-[1rem] font-semibold text-[#53443b] outline-none transition placeholder:text-[#c7bdb0] ${
+            error
+              ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/14 focus:bg-red-50"
+              : "border-[#a9a2a2] focus:border-[#f0a22b] focus:bg-white focus:ring-4 focus:ring-[#f0a22b]/14"
+          }`}
         />
         {type === "password" ? (
           <span className="absolute inset-y-0 right-5 flex items-center text-[#6b584a]">
@@ -109,7 +122,9 @@ function InputField({
           </span>
         ) : null}
       </span>
-      {helper ? (
+      {error ? (
+        <p className="mt-2 text-[0.78rem] font-semibold text-red-600">{error}</p>
+      ) : helper ? (
         <p className="mt-2 text-[0.78rem] text-[#a47b31]">{helper}</p>
       ) : null}
     </label>
@@ -142,34 +157,70 @@ export function RegisterForm() {
   const [password, setPassword] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    const error = validateUsername(value);
+    setErrors((prev) => ({
+      ...prev,
+      username: error || "",
+    }));
+  };
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    const error = validateEmail(value);
+    setErrors((prev) => ({
+      ...prev,
+      email: error || "",
+    }));
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    const error = validatePassword(value);
+    setErrors((prev) => ({
+      ...prev,
+      password: error || "",
+    }));
+  };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
     setStatusMessage("");
 
-    try {
-      const response = await fetch("/api/user/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, email, password }),
+    // Validate all fields
+    const validation = validateRegistration(username, email, password);
+    if (!validation.isValid) {
+      const errorMap: { [key: string]: string } = {};
+      validation.errors.forEach((err) => {
+        errorMap[err.field] = err.message;
       });
-
-      const data = (await response.json()) as { error?: string; message?: string };
-
-      if (!response.ok) {
-        setStatusMessage(data.error ?? "Registration failed.");
-        return;
-      }
-
-      setStatusMessage(data.message ?? "Registration sent successfully.");
-    } catch {
-      setStatusMessage("Unable to reach the register API.");
-    } finally {
-      setIsSubmitting(false);
+      setErrors(errorMap);
+      setStatusMessage("Harap periksa kembali form Anda");
+      return;
     }
+
+    setIsSubmitting(true);
+    const response = await authApi.register(username, email, password);
+
+    if (!response.success) {
+      setStatusMessage(response.error ?? "Registration failed.");
+    } else {
+      setStatusMessage("Registration sent successfully.");
+      setUsername("");
+      setEmail("");
+      setPassword("");
+      setErrors({});
+      
+      // Redirect ke profile picker setelah 1 detik
+      setTimeout(() => {
+        window.location.href = "/profile";
+      }, 1000);
+    }
+
+    setIsSubmitting(false);
   }
 
   return (
@@ -189,14 +240,16 @@ export function RegisterForm() {
               icon="user"
               placeholder="username"
               value={username}
-              onChange={setUsername}
+              onChange={handleUsernameChange}
+              error={errors.username}
             />
             <InputField
               label="Parent email"
               icon="mail"
               placeholder="parent@email.com"
               value={email}
-              onChange={setEmail}
+              onChange={handleEmailChange}
+              error={errors.email}
             />
             <InputField
               label="Password"
@@ -204,7 +257,8 @@ export function RegisterForm() {
               placeholder="••••••••"
               type="password"
               value={password}
-              onChange={setPassword}
+              onChange={handlePasswordChange}
+              error={errors.password}
             />
           </div>
 
@@ -233,40 +287,79 @@ export function RegisterForm() {
 }
 
 export function LoginForm() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setStatusMessage("");
+
+    const response = await authApi.login(username, password);
+
+    if (!response.success) {
+      setStatusMessage(response.error ?? "Login failed.");
+    } else {
+      setStatusMessage("Login successful!");
+      // Redirect ke profile picker setelah 1 detik
+      setTimeout(() => {
+        window.location.href = "/profile";
+      }, 1000);
+    }
+
+    setIsSubmitting(false);
+  }
+
   return (
     <CardShell>
       <div className="relative z-10">
-        <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
-          Expedition Login
-        </h1>
-        <p className="mt-3 text-[1.05rem] font-medium text-[#6b5649]">
-          Ready to continue your journey?
-        </p>
+        <form onSubmit={handleSubmit}>
+          <h1 className="max-w-md text-4xl font-black tracking-[-0.06em] text-[#f49416] sm:text-5xl">
+            Expedition Login
+          </h1>
+          <p className="mt-3 text-[1.05rem] font-medium text-[#6b5649]">
+            Ready to continue your journey?
+          </p>
 
-        <div className="mt-8 space-y-5">
-          <InputField
-            label="Username"
-            icon="user"
-            placeholder="username"
-          />
-          <InputField
-            label="Password"
-            icon="lock"
-            placeholder="••••••••"
-            type="password"
-          />
-        </div>
+          <div className="mt-8 space-y-5">
+            <InputField
+              label="Username"
+              icon="user"
+              placeholder="username"
+              value={username}
+              onChange={setUsername}
+            />
+            <InputField
+              label="Password"
+              icon="lock"
+              placeholder="••••••••"
+              type="password"
+              value={password}
+              onChange={setPassword}
+            />
+          </div>
 
-        <div className="mt-10">
-          <PrimaryAction>LET'S GO!</PrimaryAction>
-        </div>
+          <div className="mt-10">
+            <PrimaryAction>
+              {isSubmitting ? "LOGGING IN..." : "LET'S GO!"}
+            </PrimaryAction>
+          </div>
 
-        <p className="mt-7 text-center text-[0.95rem] font-semibold text-[#6f5a4d]">
-          New to the team?{" "}
-          <Link href="/auth/register" className="font-black text-[#f39211]">
-            Join the Expedition
-          </Link>
-        </p>
+          {statusMessage ? (
+            <p className="mt-4 text-center text-[0.92rem] font-semibold text-[#8b5a18]">
+              {statusMessage}
+            </p>
+          ) : null}
+
+          <p className="mt-7 text-center text-[0.95rem] font-semibold text-[#6f5a4d]">
+            New to the team?{" "}
+            <Link href="/auth/register" className="font-black text-[#f39211]">
+              Join the Expedition
+            </Link>
+          </p>
+        </form>
       </div>
     </CardShell>
   );
