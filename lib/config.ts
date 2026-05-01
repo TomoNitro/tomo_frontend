@@ -15,12 +15,16 @@ export const API_CONFIG = {
     },
     USER: {
       PROFILE: "/api/user/profile",
-      UPDATE: "/api/user/update",
+      UPDATE: "/api/parent/update",
+    },
+    PARENT: {
+      INFO: "/api/parent/info",
     },
     CHILDREN: {
       REGISTER: "/api/children/register",
       LOGIN: "/api/children/login",
       GET_LIST: "/api/children",
+      DELETE: "/api/children/:id",
     },
   },
 };

@@ -212,12 +212,24 @@ export function RegisterForm() {
     if (!response.success) {
       setStatusMessage(response.error ?? "Registration failed.");
     } else {
+      const responseData = response.data as Record<string, any> | undefined;
+      const sender = responseData?.user ?? responseData?.data ?? {};
+      const savedName = typeof sender.username === "string" ? sender.username.trim() : username;
+      const savedEmail = typeof sender.email === "string" ? sender.email.trim() : email;
+
+      window.localStorage.setItem("tomoParentName", savedName);
+      window.localStorage.setItem("tomoParentEmail", savedEmail);
+      window.localStorage.setItem(
+        "tomoParentProfile",
+        JSON.stringify({ name: savedName, email: savedEmail })
+      );
+
       setStatusMessage("Registration sent successfully.");
       setUsername("");
       setEmail("");
       setPassword("");
       setErrors({});
-      router.push("/profile");
+      router.push(`/parent/profile?name=${encodeURIComponent(savedName)}&email=${encodeURIComponent(savedEmail)}`);
     }
 
     setIsSubmitting(false);

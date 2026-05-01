@@ -30,6 +30,8 @@ interface ChildrenPickerProps {
   onChildSelect: (child: ChildProfile | "parent") => void;
   onAddChild?: (username: string, pin: string) => void;
   isLoadingChildren?: boolean;
+  defaultMode?: Mode;
+  onClose?: () => void;
 }
 
 function InputFieldSmall({
@@ -198,8 +200,10 @@ export function ChildrenPickerModal({
   children: childrenList = [],
   onChildSelect,
   onAddChild,
+  defaultMode = "picker",
+  onClose,
 }: ChildrenPickerProps) {
-  const [mode, setMode] = useState<Mode>("picker");
+  const [mode, setMode] = useState<Mode>(defaultMode);
   const [childUsername, setChildUsername] = useState("");
   const [childPin, setChildPin] = useState("");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -215,6 +219,11 @@ export function ChildrenPickerModal({
   };
 
   const handleBack = () => {
+    if (onClose) {
+      onClose();
+      return;
+    }
+
     setMode("picker");
     setChildUsername("");
     setChildPin("");
