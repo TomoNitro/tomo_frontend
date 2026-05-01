@@ -43,7 +43,7 @@ export default function MascotClient({
         style={{ animation: "bubble-sway 4s ease-in-out infinite" }}
       >
         <p className="max-w-[18rem] text-[1.06rem] sm:text-[1.12rem] font-black leading-[1.03] text-[#2e261f]">
-          Hai, I'm Tomo! Let's start our financial adventure together.
+          Hai, I&apos;m Tomo! Let&apos;s start our financial adventure together.
         </p>
         <div className="absolute bottom-[-11px] left-[18%] h-5 w-5 rotate-45 bg-white shadow-[-4px_4px_10px_rgba(135,90,35,0.08)]" />
       </div>
