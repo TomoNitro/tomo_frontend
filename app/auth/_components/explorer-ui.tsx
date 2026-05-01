@@ -233,7 +233,7 @@ export function RegisterForm() {
       setEmail("");
       setPassword("");
       setErrors({});
-      router.push(`/parent/profile?name=${encodeURIComponent(savedName)}&email=${encodeURIComponent(savedEmail)}`);
+      router.push("/profile");
     }
 
     setIsSubmitting(false);
@@ -354,7 +354,7 @@ export function LoginForm() {
       setStatusMessage(response.error ?? "Email atau password belum sesuai.");
     } else {
       setStatusMessage("Login successful.");
-      router.push("/parent/dashboard");
+      router.push("/profile");
     }
 
     setIsSubmitting(false);
