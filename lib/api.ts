@@ -11,7 +11,6 @@ export interface ApiResponse<T = unknown> {
   error?: string;
 }
 
-<<<<<<< HEAD
 export interface ChildProfile {
   id: string;
   name: string;
@@ -106,8 +105,6 @@ function hasChildToken(): boolean {
   return Boolean(childAuthHeaders().Authorization);
 }
 
-=======
->>>>>>> a6330a6 (Refactor code structure for improved readability and maintainability)
 /**
  * Generic fetch wrapper for API calls
  */
@@ -152,7 +149,6 @@ async function apiCall<T>(
  */
 export const authApi = {
   register: async (username: string, email: string, password: string) => {
-<<<<<<< HEAD
     const res = await apiCall(API_CONFIG.ENDPOINTS.AUTH.REGISTER, {
       method: "POST",
       credentials: "include",
@@ -170,19 +166,6 @@ export const authApi = {
     });
     if (res.success) storeTokenFromResponse(res.data);
     return res;
-=======
-    return apiCall(API_CONFIG.ENDPOINTS.AUTH.REGISTER, {
-      method: "POST",
-      body: JSON.stringify({ username, email, password }),
-    });
-  },
-
-  login: async (email: string, password: string) => {
-    return apiCall(API_CONFIG.ENDPOINTS.AUTH.LOGIN, {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
->>>>>>> a6330a6 (Refactor code structure for improved readability and maintainability)
   },
 
   logout: async () => {
@@ -214,7 +197,6 @@ export const userApi = {
  * Children API calls
  */
 export const childrenApi = {
-<<<<<<< HEAD
   register: async (username: string, pin: string) => {
     return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.REGISTER, {
       method: "POST",
@@ -411,27 +393,4 @@ export const childrenApi = {
 
     return { success: false, error: "Saving goal tidak valid." };
   },
-
-=======
-  register: async (username: string, pin: string, parentId?: string) => {
-    return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.REGISTER, {
-      method: "POST",
-      body: JSON.stringify({ username, pin, parentId }),
-    });
-  },
-
-  login: async (username: string, pin: string) => {
-    return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.LOGIN, {
-      method: "POST",
-      body: JSON.stringify({ username, pin }),
-    });
-  },
-
-  getList: async (parentId?: string) => {
-    const params = parentId ? `?parentId=${parentId}` : "";
-    return apiCall(`${API_CONFIG.ENDPOINTS.CHILDREN.GET_LIST}${params}`, {
-      method: "GET",
-    });
-  },
->>>>>>> a6330a6 (Refactor code structure for improved readability and maintainability)
 };
