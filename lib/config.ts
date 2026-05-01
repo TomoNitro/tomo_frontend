@@ -28,8 +28,15 @@ export const API_CONFIG = {
     CHILDREN: {
       REGISTER: "/api/children/register",
       LOGIN: "/api/children/login",
+      UPDATE_NAME: "/api/children/name",
       GET_LIST: "/api/children",
+<<<<<<< HEAD
       DELETE: "/api/children/:id",
+=======
+      MARKETS: "/api/children/markets",
+      COINS: "/api/children/coins",
+      SAVING_GOAL: "/api/children/saving-goal",
+>>>>>>> dcffc85 (feat: implement child profile management and saving goals functionality)
     },
   },
 };
