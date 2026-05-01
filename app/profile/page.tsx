@@ -37,7 +37,7 @@ export default function ProfilePickerPage() {
 
   return (
     <ChildrenPickerModal
-      children={children}
+      childProfiles={children}
       onChildSelect={handleChildSelect}
       isLoadingChildren={isLoading}
     />

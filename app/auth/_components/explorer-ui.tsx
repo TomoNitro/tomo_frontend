@@ -64,7 +64,7 @@ function SmallMascot({ tone }: { tone: SceneTone }) {
           <source srcSet={`/images/${imageName}.png`} type="image/png" />
 <<<<<<< HEAD
           <img
-            src={`/images/${imageName}.svg`}
+            src={`/images/${imageName}.png`}
             alt={`Tomo mascot ${imageName}`}
             className="h-[20rem] w-[16rem] object-contain sm:h-[22rem] sm:w-[18rem]"
           />
@@ -214,7 +214,7 @@ export function RegisterForm() {
     const response = await authApi.register(username, email, password);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Registration failed.");
+      setStatusMessage(response.error ?? "Akun belum bisa dibuat. Silakan coba lagi.");
     } else {
       const responseData = response.data as Record<string, any> | undefined;
       const sender = responseData?.user ?? responseData?.data ?? {};
@@ -348,7 +348,10 @@ export function LoginForm() {
     const response = await authApi.login(email, password);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Login failed.");
+      setErrors({
+        password: "Email atau password belum sesuai.",
+      });
+      setStatusMessage(response.error ?? "Email atau password belum sesuai.");
     } else {
       setStatusMessage("Login successful.");
       router.push("/parent/dashboard");
