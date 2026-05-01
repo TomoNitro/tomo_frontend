@@ -20,11 +20,15 @@ export const API_CONFIG = {
     CHILDREN: {
       REGISTER: "/api/children/register",
       LOGIN: "/api/children/login",
+<<<<<<< HEAD
       UPDATE_NAME: "/api/children/name",
       GET_LIST: "/api/children",
       MARKETS: "/api/children/markets",
       COINS: "/api/children/coins",
       SAVING_GOAL: "/api/children/saving-goal",
+=======
+      GET_LIST: "/api/children/list",
+>>>>>>> a6330a6 (Refactor code structure for improved readability and maintainability)
     },
   },
 };
