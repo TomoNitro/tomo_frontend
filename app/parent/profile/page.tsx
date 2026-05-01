@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { authApi, childrenApi, parentApi, userApi, type ChildProfile } from "@/lib/api";
 import { ChildrenPickerModal } from "@/app/auth/_components/children-picker";
 
@@ -73,7 +73,6 @@ function SaveIcon() {
 
 export default function EditProfile() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [parentName, setParentName] = useState("");
   const [email, setEmail] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -85,6 +84,7 @@ export default function EditProfile() {
 
   useEffect(() => {
     const loadProfile = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
       const storedProfile = window.localStorage.getItem("tomoParentProfile");
       const storedName = window.localStorage.getItem("tomoParentName");
       const storedEmail = window.localStorage.getItem("tomoParentEmail");
@@ -150,7 +150,7 @@ export default function EditProfile() {
     };
 
     loadProfile();
-  }, [searchParams]);
+  }, []);
 
   const childCards = useMemo(
     () =>
@@ -384,7 +384,7 @@ export default function EditProfile() {
 
       {isAddingChild ? (
         <ChildrenPickerModal
-          children={children}
+          childProfiles={children}
           onChildSelect={() => undefined}
           onAddChild={async () => {
             await refreshChildren();
