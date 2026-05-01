@@ -157,9 +157,7 @@ export default function ChildLoginPage() {
     } else {
       setStatusMessage("Login successful!");
       localStorage.setItem("selectedUser", childName);
-      setTimeout(() => {
-        router.push("/child/dashboard");
-      }, 1000);
+      router.push("/child/dashboard");
     }
 
     setIsSubmitting(false);

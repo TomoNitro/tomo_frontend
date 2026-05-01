@@ -40,6 +40,35 @@ function storeTokenFromResponse(data: unknown) {
   if (t) window.localStorage.setItem(AUTH_TOKEN_KEY, t);
 }
 
+function storeParentProfileFromResponse(data: unknown) {
+  if (typeof window === "undefined" || !data || typeof data !== "object") return;
+
+  const record = data as Record<string, unknown>;
+  const source = record.user && typeof record.user === "object" ? record.user : record.data && typeof record.data === "object" ? record.data : record;
+  const profile = source as Record<string, unknown>;
+
+  const name = profile.username ?? profile.name ?? profile.fullName;
+  const email = profile.email;
+
+  if (typeof name === "string" && name.trim()) {
+    window.localStorage.setItem("tomoParentName", name.trim());
+  }
+
+  if (typeof email === "string" && email.trim()) {
+    window.localStorage.setItem("tomoParentEmail", email.trim());
+  }
+
+  if ((typeof name === "string" && name.trim()) || (typeof email === "string" && email.trim())) {
+    window.localStorage.setItem(
+      "tomoParentProfile",
+      JSON.stringify({
+        name: typeof name === "string" ? name.trim() : "",
+        email: typeof email === "string" ? email.trim() : "",
+      })
+    );
+  }
+}
+
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(AUTH_TOKEN_KEY);
@@ -164,7 +193,10 @@ export const authApi = {
       credentials: "include",
       body: JSON.stringify({ username, email, password }),
     });
-    if (res.success) storeTokenFromResponse(res.data);
+    if (res.success) {
+      storeTokenFromResponse(res.data);
+      storeParentProfileFromResponse(res.data);
+    }
     return res;
   },
 
@@ -174,7 +206,10 @@ export const authApi = {
       credentials: "include",
       body: JSON.stringify({ email, password }),
     });
-    if (res.success) storeTokenFromResponse(res.data);
+    if (res.success) {
+      storeTokenFromResponse(res.data);
+      storeParentProfileFromResponse(res.data);
+    }
     return res;
   },
 
@@ -198,7 +233,26 @@ export const userApi = {
   updateProfile: async (userData: Record<string, unknown>) => {
     return apiCall(API_CONFIG.ENDPOINTS.USER.UPDATE, {
       method: "PUT",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
       body: JSON.stringify(userData),
+    });
+  },
+};
+
+/**
+ * Parent API calls
+ */
+export const parentApi = {
+  getInfo: async () => {
+    return apiCall(API_CONFIG.ENDPOINTS.PARENT.INFO, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
     });
   },
 };
@@ -253,5 +307,16 @@ export const childrenApi = {
     }
 
     return { success: true, data: [] };
+  },
+
+  delete: async (childId: string) => {
+    const endpoint = API_CONFIG.ENDPOINTS.CHILDREN.DELETE.replace(":id", childId);
+    return apiCall(endpoint, {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+    });
   },
 };
