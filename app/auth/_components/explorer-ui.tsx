@@ -358,11 +358,7 @@ export function LoginForm() {
       setStatusMessage(response.error ?? "Email atau password belum sesuai.");
     } else {
       setStatusMessage("Login successful.");
-<<<<<<< HEAD
       router.push("/parent/dashboard");
-=======
-      router.push("/parent/profile");
->>>>>>> 02724dc (feat: update routing in LoginForm and enhance parent profile data retrieval in EditProfile)
     }
 
     setIsSubmitting(false);
