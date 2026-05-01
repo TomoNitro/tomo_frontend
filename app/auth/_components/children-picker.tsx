@@ -26,7 +26,7 @@ function getChildAvatarSrc(seed: string) {
 }
 
 interface ChildrenPickerProps {
-  children: ChildProfile[];
+  childProfiles: ChildProfile[];
   onChildSelect: (child: ChildProfile | "parent") => void;
   onAddChild?: (username: string, pin: string) => void;
   isLoadingChildren?: boolean;
@@ -159,7 +159,7 @@ function ProfileCard({
           <picture>
             <source srcSet="/images/tomo3.png" type="image/png" />
             <img
-              src="/images/tomo3.svg"
+              src="/images/tomo3.png"
               alt="Tomo parent"
               className="h-full w-full object-cover"
             />
@@ -195,7 +195,7 @@ function ProfileCard({
 }
 
 export function ChildrenPickerModal({
-  children: childrenList = [],
+  childProfiles: childrenList = [],
   onChildSelect,
   onAddChild,
 }: ChildrenPickerProps) {
@@ -249,7 +249,7 @@ export function ChildrenPickerModal({
     const response = await childrenApi.register(childUsername, childPin);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Gagal menambah anak");
+      setStatusMessage(response.error ?? "Profil anak belum bisa ditambahkan. Silakan coba lagi.");
     } else {
       setStatusMessage("Anak berhasil ditambahkan!");
       onAddChild?.(childUsername, childPin);
@@ -274,7 +274,7 @@ export function ChildrenPickerModal({
                 <picture>
                   <source srcSet="/images/tomo1.png" type="image/png" />
                   <img
-                    src="/images/tomo1.svg"
+                    src="/images/tomo1.png"
                     alt="Tomo mascot"
                     className="h-[20rem] w-[16rem] object-contain sm:h-[22rem] sm:w-[18rem]"
                   />
@@ -283,7 +283,7 @@ export function ChildrenPickerModal({
 
               <div className="absolute left-1/2 top-[6%] w-[15rem] -translate-x-1/2 rounded-[20px] bg-white px-6 py-5 text-center shadow-[0_18px_32px_rgba(127,91,45,0.12)] sm:left-[18%] sm:translate-x-0">
                 <p className="text-[0.95rem] font-black leading-6 text-[#31291f]">
-                  "Ready to add a new profile?"
+                  &quot;Ready to add a new profile?&quot;
                 </p>
                 <div className="absolute bottom-[-10px] left-[38%] h-5 w-5 rotate-45 bg-white" />
               </div>
@@ -359,7 +359,7 @@ export function ChildrenPickerModal({
         {/* Header */}
         <div className="mb-20 text-center">
           <h1 className="text-5xl font-black tracking-[-0.06em] text-[#f49416] sm:text-6xl lg:text-7xl">
-            Who's watching?
+            Who&apos;s exploring?
           </h1>
           <p className="mt-6 text-lg font-medium text-[#5f4d42] sm:text-xl">
             Select a profile to continue with Tomo

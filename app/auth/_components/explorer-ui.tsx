@@ -62,7 +62,7 @@ function SmallMascot({ tone }: { tone: SceneTone }) {
       <div className="relative h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] flex items-center justify-center">
         <picture>
           <source srcSet={`/images/${imageName}.png`} type="image/png" />
-          <img src={`/images/${imageName}.svg`} alt={`Tomo mascot ${imageName}`} className="h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] object-contain" />
+          <img src={`/images/${imageName}.png`} alt={`Tomo mascot ${imageName}`} className="h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] object-contain" />
         </picture>
       </div>
 
@@ -208,7 +208,7 @@ export function RegisterForm() {
     const response = await authApi.register(username, email, password);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Registration failed.");
+      setStatusMessage(response.error ?? "Akun belum bisa dibuat. Silakan coba lagi.");
     } else {
       setStatusMessage("Registration sent successfully.");
       setUsername("");
@@ -320,7 +320,10 @@ export function LoginForm() {
     const response = await authApi.login(email, password);
 
     if (!response.success) {
-      setStatusMessage(response.error ?? "Login failed.");
+      setErrors({
+        password: "Email atau password belum sesuai.",
+      });
+      setStatusMessage(response.error ?? "Email atau password belum sesuai.");
     } else {
       setStatusMessage("Login successful!");
       // Redirect ke profile picker setelah 1 detik
