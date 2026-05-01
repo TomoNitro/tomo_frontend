@@ -43,11 +43,12 @@ function storeTokenFromResponse(data: unknown) {
 function storeParentProfileFromResponse(data: unknown) {
   if (typeof window === "undefined" || !data || typeof data !== "object") return;
 
-  const record = data as Record<string, any>;
+  const record = data as Record<string, unknown>;
   const source = record.user && typeof record.user === "object" ? record.user : record.data && typeof record.data === "object" ? record.data : record;
+  const profile = source as Record<string, unknown>;
 
-  const name = source.username ?? source.name ?? source.fullName;
-  const email = source.email;
+  const name = profile.username ?? profile.name ?? profile.fullName;
+  const email = profile.email;
 
   if (typeof name === "string" && name.trim()) {
     window.localStorage.setItem("tomoParentName", name.trim());
