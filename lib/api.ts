@@ -21,7 +21,7 @@ const AUTH_TOKEN_KEY = "tomoAuthToken";
 
 function extractToken(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
-  const d = data as Record<string, unknown>;
+  const d = data as Record<string, any>;
   if (typeof d.accessToken === "string") return d.accessToken;
   if (typeof d.token === "string") return d.token;
   if (typeof d.jwt === "string") return d.jwt;
@@ -43,12 +43,11 @@ function storeTokenFromResponse(data: unknown) {
 function storeParentProfileFromResponse(data: unknown) {
   if (typeof window === "undefined" || !data || typeof data !== "object") return;
 
-  const record = data as Record<string, unknown>;
+  const record = data as Record<string, any>;
   const source = record.user && typeof record.user === "object" ? record.user : record.data && typeof record.data === "object" ? record.data : record;
-  const profile = source as Record<string, unknown>;
 
-  const name = profile.username ?? profile.name ?? profile.fullName;
-  const email = profile.email;
+  const name = source.username ?? source.name ?? source.fullName;
+  const email = source.email;
 
   if (typeof name === "string" && name.trim()) {
     window.localStorage.setItem("tomoParentName", name.trim());
@@ -79,71 +78,6 @@ function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-function getFriendlyApiError(status: number, data: unknown): string {
-  const message =
-    data && typeof data === "object"
-      ? String(
-          (data as { error?: unknown; message?: unknown }).error ||
-            (data as { error?: unknown; message?: unknown }).message ||
-            ""
-        )
-      : "";
-  const normalizedMessage = message.toLowerCase();
-
-  if (
-    status === 400 &&
-    (normalizedMessage.includes("pin") ||
-      normalizedMessage.includes("password") ||
-      normalizedMessage.includes("record not found") ||
-      normalizedMessage.includes("not found") ||
-      normalizedMessage.includes("invalid") ||
-      normalizedMessage.includes("code=400"))
-  ) {
-    return "Email, password, atau PIN belum sesuai. Silakan coba lagi.";
-  }
-
-  if (status === 401 || status === 403) {
-    return "Email, password, atau PIN belum sesuai. Silakan coba lagi.";
-  }
-
-  if (status === 404 || normalizedMessage.includes("record not found")) {
-    return "Data belum ditemukan. Silakan muat ulang atau pilih profil lagi.";
-  }
-
-  if (status === 409) {
-    return "Data ini sudah digunakan. Silakan pakai yang lain.";
-  }
-
-  if (status === 422) {
-    return "Data yang diisi belum sesuai. Silakan periksa kembali.";
-  }
-
-  if (status >= 500) {
-    return "Server sedang bermasalah. Coba lagi sebentar lagi.";
-  }
-
-  if (
-    message &&
-    !message.match(/^http\s+\d+/i) &&
-    !normalizedMessage.includes("code=") &&
-    !normalizedMessage.includes("record not found")
-  ) {
-    return message;
-  }
-
-  return "Terjadi kesalahan. Silakan coba lagi.";
-}
-
-function getFriendlyNetworkError(error: unknown): string {
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
-
-  if (message.includes("failed to fetch") || message.includes("network")) {
-    return "Koneksi bermasalah. Periksa internet lalu coba lagi.";
-  }
-
-  return "Terjadi kesalahan. Silakan coba lagi.";
-}
-
 /**
  * Generic fetch wrapper for API calls
  */
@@ -167,7 +101,7 @@ async function apiCall<T>(
     if (!response.ok) {
       return {
         success: false,
-        error: getFriendlyApiError(response.status, data),
+        error: data.error || `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 
@@ -178,7 +112,7 @@ async function apiCall<T>(
   } catch (error) {
     return {
       success: false,
-      error: getFriendlyNetworkError(error),
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 }
@@ -261,7 +195,7 @@ export const parentApi = {
  * Children API calls
  */
 export const childrenApi = {
-  register: async (username: string, pin: string) => {
+  register: async (username: string, pin: string, parentId?: string) => {
     return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.REGISTER, {
       method: "POST",
       credentials: "include",
@@ -296,7 +230,7 @@ export const childrenApi = {
 
     if (!res.success) return { success: false, error: res.error };
 
-    const body = res.data as { data?: unknown };
+    const body = res.data as any;
     if (body && Array.isArray(body.data)) {
       return { success: true, data: body.data as ChildProfile[] };
     }
