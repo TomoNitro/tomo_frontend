@@ -285,7 +285,7 @@ export function RegisterForm() {
           </div>
 
           <div className="mt-8">
-            <PrimaryAction isLoading={isSubmitting}>LET&apos;S GO!</PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>{"LET'S GO!"}</PrimaryAction>
           </div>
 
           {statusMessage ? (
@@ -348,6 +348,7 @@ export function LoginForm() {
       return;
     }
 
+    setErrors({});
     const response = await authApi.login(email, password);
 
     if (!response.success) {
@@ -392,7 +393,7 @@ export function LoginForm() {
           </div>
 
           <div className="mt-10">
-            <PrimaryAction isLoading={isSubmitting}>LET&apos;S GO!</PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>{"LET'S GO!"}</PrimaryAction>
           </div>
 
           {statusMessage ? (
