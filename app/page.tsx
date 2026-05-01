@@ -1,44 +1,6 @@
 import Link from "next/link";
 import MascotClient from "./components/MascotClient";
 
-function MascotHero() {
-  return (
-    <div className="relative h-[420px] w-[420px] max-w-full sm:h-[480px] sm:w-[480px]">
-      <div className="absolute inset-0 rounded-full bg-[#ffe27d]/35 blur-3xl" />
-      <div className="absolute left-[8%] bottom-[6%] h-[22%] w-[68%] rounded-[999px] bg-gradient-to-r from-[#8a4a1f] via-[#bf742d] to-[#8a4a1f] opacity-35 blur-2xl" />
-      <div className="absolute left-[5%] bottom-[3%] right-[5%] flex items-end justify-center gap-1">
-        {Array.from({ length: 8 }).map((_, index) => (
-          <span
-            key={index}
-            className="h-10 w-10 rounded-full border border-[#8f582a]/25 bg-gradient-to-br from-[#ffd77a] via-[#f2b438] to-[#c97717] shadow-[0_8px_18px_rgba(141,79,15,0.24)]"
-            style={{ transform: `translateY(${index % 2 === 0 ? 0 : 6}px)` }}
-          />
-        ))}
-      </div>
-      <div className="absolute left-[11%] bottom-[12%] h-16 w-28 rounded-[18px] rotate-[-14deg] bg-gradient-to-b from-[#ffd97e] to-[#d68b22] shadow-[0_10px_18px_rgba(150,90,20,0.24)]" />
-      <div className="absolute right-[10%] bottom-[10%] h-16 w-28 rounded-[18px] rotate-[14deg] bg-gradient-to-b from-[#ffd97e] to-[#d68b22] shadow-[0_10px_18px_rgba(150,90,20,0.24)]" />
-
-      <div className="absolute left-1/2 top-[20%] h-[62%] w-[56%] -translate-x-1/2 flex items-center justify-center z-10">
-        <picture className="block w-full h-full">
-          <source srcSet="/images/tomo2.png" type="image/png" />
-          <img
-            src="/images/tomo2.png"
-            alt="Tomo mascot"
-            className="mx-auto h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(141,74,10,0.12)]"
-          />
-        </picture>
-      </div>
-
-      <div className="absolute left-[34%] top-[6%] w-[18rem] sm:w-[20rem] rotate-[6deg] rounded-[22px] bg-white px-6 py-5 text-left shadow-[0_18px_36px_rgba(127,91,45,0.12)] z-20">
-        <p className="max-w-[18rem] text-[1.06rem] sm:text-[1.12rem] font-black leading-[1.03] text-[#2e261f]">
-          Hai, I'm Tomo! Let's start our financial adventure together.
-        </p>
-        <div className="absolute bottom-[-11px] left-[18%] h-5 w-5 rotate-45 bg-white shadow-[-4px_4px_10px_rgba(135,90,35,0.08)]" />
-      </div>
-    </div>
-  );
-}
-
 function SectionPill() {
   return (
     <div className="inline-flex items-center gap-2 rounded-full border border-[#e3b05a]/40 bg-white/60 px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.28em] text-[#b06e0a] shadow-[0_10px_25px_rgba(164,112,24,0.08)] backdrop-blur-sm">
