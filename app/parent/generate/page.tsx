@@ -120,7 +120,7 @@ export default function ParentGeneratePage() {
             </div>
 
             <div className="hidden justify-center lg:flex">
-              <img src="/images/tomo2.svg" alt="Tomo mascot" className="h-72 w-72 object-contain" />
+              <img src="/images/tomo2.png" alt="Tomo mascot" className="h-72 w-72 object-contain" />
             </div>
           </div>
         </section>
