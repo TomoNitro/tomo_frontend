@@ -63,6 +63,31 @@ function storeTokenFromResponse(data: unknown) {
   }
 }
 
+function storeParentProfileFromResponse(data: unknown) {
+  if (typeof window === "undefined") return;
+  if (!data || typeof data !== "object") return;
+  const d = data as any;
+  const src = d.user || d.data || d.profile || d.parent || d;
+
+  const name =
+    (src && (src.username || src.name || src.fullName || src.full_name)) || "";
+  const email = (src && (src.email || "")) || "";
+  const id = (src && (src.id || src._id || src.parentId)) || "";
+
+  try {
+    if (typeof name === "string" && name.trim()) {
+      window.localStorage.setItem("tomoParentName", name.trim());
+    }
+    if (typeof email === "string" && email.trim()) {
+      window.localStorage.setItem("tomoParentEmail", email.trim());
+    }
+    const profileObj = { id: id || null, name: name || null, email: email || null };
+    window.localStorage.setItem("tomoParentProfile", JSON.stringify(profileObj));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 function storeChildTokenFromResponse(data: unknown) {
   if (typeof window === "undefined") return;
   const t = extractToken(data);
