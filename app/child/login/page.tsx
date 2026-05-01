@@ -169,7 +169,7 @@ export default function ChildLoginPage() {
               <picture>
                 <source srcSet={`/images/tomo1.png`} type="image/png" />
                 <img
-                  src={`/images/tomo1.svg`}
+                  src={`/images/tomo1.png`}
                   alt="Tomo mascot"
                   className="h-[20rem] w-[16rem] sm:h-[22rem] sm:w-[18rem] object-contain"
                 />

@@ -283,7 +283,7 @@ export function ChildrenPickerModal({
                 <picture>
                   <source srcSet="/images/tomo1.png" type="image/png" />
                   <img
-                    src="/images/tomo1.svg"
+                    src="/images/tomo1.png"
                     alt="Tomo mascot"
                     className="h-[20rem] w-[16rem] object-contain sm:h-[22rem] sm:w-[18rem]"
                   />
