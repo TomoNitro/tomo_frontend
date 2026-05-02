@@ -41,6 +41,7 @@ export const API_CONFIG = {
       MARKETS: "/api/children/markets",
       COINS: "/api/children/coins",
       SAVING_GOAL: "/api/children/saving-goal",
+      PROGRESS: "/api/children/progress",
     },
     SESSIONS: {
       DECISION: "/api/sessions/:sessionId/decision",

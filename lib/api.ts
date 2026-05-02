@@ -152,6 +152,24 @@ export interface MarketItem {
   created_at?: string;
 }
 
+export interface ChildBadge {
+  id: string;
+  name: string;
+  description: string;
+  level_required: number;
+  image_url?: string;
+  earned?: boolean;
+  earned_at?: string;
+}
+
+export interface ChildProgress {
+  total_exp: number;
+  level: number;
+  next_level_exp: number;
+  exp_to_next_level: number;
+  badges: ChildBadge[];
+}
+
 const AUTH_TOKEN_KEY = "tomoAuthToken";
 const CHILD_AUTH_TOKEN_KEY = "tomoChildAuthToken";
 const AUTH_TOKEN_FALLBACK_KEYS = ["accessToken", "token"];
@@ -442,6 +460,65 @@ function normalizeChildStoryHeader(item: unknown): ChildStoryHeader | null {
       getStringField(source, ["image_url", "imageUrl"]) ||
       getStringField(nestedStory, ["image_url", "imageUrl"]),
     created_at: getStringField(source, ["created_at", "createdAt"]),
+  };
+}
+
+function normalizeChildBadge(data: unknown): ChildBadge | null {
+  if (!isRecord(data)) return null;
+
+  const id = getStringField(data, ["id", "_id", "badge_id", "badgeId"]);
+  const name = getStringField(data, ["name", "title", "label"]);
+
+  if (!id && !name) return null;
+
+  return {
+    id: id || name,
+    name: name || id || "Badge",
+    description: getStringField(data, ["description", "desc", "details"]),
+    level_required: getNumberField(data, [
+      "level_required",
+      "levelRequired",
+      "required_level",
+      "requiredLevel",
+    ]) ?? 0,
+    image_url: getStringField(data, ["image_url", "imageUrl", "icon_url", "iconUrl"]) || undefined,
+    earned: getBooleanField(data, ["earned", "is_earned", "isEarned", "owned"]),
+    earned_at: getStringField(data, [
+      "earned_at",
+      "earnedAt",
+      "awarded_at",
+      "awardedAt",
+      "created_at",
+      "createdAt",
+    ]) || undefined,
+  };
+}
+
+function normalizeChildProgress(data: unknown): ChildProgress | null {
+  if (!isRecord(data)) return null;
+
+  const source = isRecord(data.data) ? data.data : data;
+  const totalExp = getNumberField(source, ["total_exp", "totalExp", "exp", "xp"]) ?? 0;
+  const level = getNumberField(source, ["level", "current_level", "currentLevel"]) ?? 1;
+  const nextLevelExp =
+    getNumberField(source, ["next_level_exp", "nextLevelExp", "next_level", "nextLevel"]) ??
+    Math.max(50, level * 50);
+  const expToNext =
+    getNumberField(source, ["exp_to_next_level", "expToNextLevel", "next_level_remaining"]) ??
+    Math.max(0, nextLevelExp - totalExp);
+  const badgesSource =
+    (isRecord(source) && Array.isArray(source.badges) ? source.badges : null) ||
+    (Array.isArray(data.badges) ? data.badges : []);
+  const badges = badgesSource
+    .map(normalizeChildBadge)
+    .filter((badge): badge is ChildBadge => Boolean(badge));
+
+  return {
+    total_exp: totalExp,
+    level,
+    next_level_exp: nextLevelExp,
+    exp_to_next_level: expToNext,
+    badges,
   };
 }
 
@@ -1269,6 +1346,30 @@ export const childrenApi = {
     const response = await pendingCoinsRequest;
     pendingCoinsRequest = null;
     return response;
+  },
+
+  getProgress: async (): Promise<ApiResponse<ChildProgress>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const res = await apiCall(API_CONFIG.ENDPOINTS.CHILDREN.PROGRESS, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...childAuthHeaders(),
+      },
+    });
+
+    if (!res.success) return { success: false, error: res.error, status: res.status };
+
+    const progress = normalizeChildProgress(res.data);
+    if (!progress) return { success: false, error: "Data progress anak tidak valid." };
+
+    return { success: true, data: progress };
   },
 
   setSavingGoal: async (marketId: string): Promise<ApiResponse<SavingGoal>> => {

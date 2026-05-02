@@ -4,7 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { childrenApi, type ChildStoryHeader, type MarketItem, type StoryNode, type StorySummary } from "@/lib/api";
+import {
+  childrenApi,
+  type ChildBadge,
+  type ChildProgress,
+  type ChildStoryHeader,
+  type MarketItem,
+  type StoryNode,
+  type StorySummary,
+} from "@/lib/api";
 import { getChildAvatarSrc } from "@/lib/child-avatar";
 import { readChildCoins, saveChildCoins } from "@/lib/child-coins";
 import { readSavingTargetId, saveSavingTargetId } from "@/lib/saving-target";
@@ -17,6 +25,50 @@ const navItems = [
 ] as const;
 
 const DEFAULT_CHILD_POINTS = 75;
+const CHILD_PROGRESS_SNAPSHOT_KEY = "tomoChildProgressSnapshot";
+
+type ProgressSnapshot = {
+  level: number;
+  badgeIds: string[];
+};
+
+type Celebration =
+  | {
+      type: "level";
+      level: number;
+    }
+  | {
+      type: "badge";
+      badge: ChildBadge;
+    };
+
+function readProgressSnapshot(): ProgressSnapshot | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(CHILD_PROGRESS_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ProgressSnapshot>;
+    const level = typeof parsed.level === "number" ? parsed.level : 1;
+    const badgeIds = Array.isArray(parsed.badgeIds)
+      ? parsed.badgeIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+      : [];
+
+    return { level, badgeIds };
+  } catch {
+    return null;
+  }
+}
+
+function saveProgressSnapshot(snapshot: ProgressSnapshot) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(CHILD_PROGRESS_SNAPSHOT_KEY, JSON.stringify(snapshot));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search" | "play" | "edit" | "coin" | "logout" | "speaker" | "wallet" | "star"; className?: string }) {
   const common = `${className} shrink-0`;
@@ -118,6 +170,7 @@ function ChildNavbar({ active }: { active: ChildPage }) {
     window.localStorage.removeItem("selectedChildId");
     window.localStorage.removeItem("selectedChildName");
     window.localStorage.removeItem("selectedUser");
+    window.localStorage.removeItem(CHILD_PROGRESS_SNAPSHOT_KEY);
     router.replace("/profile");
   }
 
@@ -221,6 +274,101 @@ function MissionRow({
   );
 }
 
+function BadgeTile({ badge }: { badge: ChildBadge }) {
+  const isEarned = badge.earned !== false;
+
+  return (
+    <div
+      className={`flex flex-col items-center gap-2 rounded-[1rem] border px-3 py-3 text-center ${
+        isEarned ? "border-[#f4c879] bg-[#fff5e1]" : "border-[#e5d6bf] bg-[#f6efe3] opacity-60"
+      }`}
+    >
+      <div
+        className={`relative flex h-14 w-14 items-center justify-center rounded-full ${
+          isEarned ? "bg-[#ffc400] text-[#6b430c]" : "bg-[#e6d8be] text-[#8b7b69]"
+        }`}
+      >
+        {badge.image_url ? (
+          <Image
+            src={badge.image_url}
+            alt={badge.name}
+            width={44}
+            height={44}
+            className="h-10 w-10 object-contain"
+          />
+        ) : (
+          <Icon name="star" className="h-7 w-7" />
+        )}
+      </div>
+      <p className="text-[0.7rem] font-black text-[#6b4a2b]">{badge.name}</p>
+      {badge.level_required ? (
+        <span className="text-[0.6rem] font-black uppercase tracking-[0.12em] text-[#9a7a4a]">
+          Level {badge.level_required}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function CelebrationModal({ celebration, onClose }: { celebration: Celebration; onClose: () => void }) {
+  const isLevelUp = celebration.type === "level";
+  const badge = celebration.type === "badge" ? celebration.badge : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2d1f12]/60 px-5">
+      <div
+        role="dialog"
+        aria-modal
+        className="relative w-full max-w-md rounded-[1.6rem] bg-[#fff7ea] p-6 text-center shadow-[0_30px_70px_rgba(37,22,10,0.35)]"
+      >
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#ffc400] text-[#7a4a0a] shadow-[0_12px_22px_rgba(255,196,0,0.4)]">
+          <Icon name="star" className="h-8 w-8" />
+        </div>
+        <h3 className="mt-4 text-3xl font-black text-[#f79418]">
+          {isLevelUp ? "Naik Level!" : "Badge Baru!"}
+        </h3>
+        {isLevelUp ? (
+          <>
+            <p className="mt-3 text-[1rem] font-black text-[#5b4635]">
+              Sekarang kamu Level {celebration.level}.
+            </p>
+            <p className="mt-2 text-[0.95rem] font-bold text-[#806006]">Terus lanjutkan petualanganmu!</p>
+          </>
+        ) : (
+          <>
+            <div className="mt-4 flex items-center justify-center">
+              {badge?.image_url ? (
+                <Image
+                  src={badge.image_url}
+                  alt={badge?.name ?? "Badge"}
+                  width={96}
+                  height={96}
+                  className="h-24 w-24 object-contain drop-shadow-[0_10px_16px_rgba(86,54,16,0.2)]"
+                />
+              ) : (
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#ffe7b5] text-[#7a4d13]">
+                  <Icon name="star" className="h-12 w-12" />
+                </div>
+              )}
+            </div>
+            <h4 className="mt-3 text-xl font-black text-[#5b4635]">{badge?.name}</h4>
+            {badge?.description ? (
+              <p className="mt-2 text-[0.92rem] font-semibold text-[#7a6146]">{badge.description}</p>
+            ) : null}
+          </>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-6 h-12 w-full rounded-full bg-[#fa9818] text-[0.95rem] font-black text-white shadow-[0_12px_22px_rgba(232,113,31,0.24)]"
+        >
+          Lanjut
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ChildHomePage() {
   const [coins, setCoins] = useState(DEFAULT_CHILD_POINTS);
   const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
@@ -229,6 +377,10 @@ export function ChildHomePage() {
   const [pendingSavingTarget, setPendingSavingTarget] = useState<MarketItem | null>(null);
   const [isSavingTargetId, setIsSavingTargetId] = useState<string | null>(null);
   const [savingTargetMessage, setSavingTargetMessage] = useState("");
+  const [progress, setProgress] = useState<ChildProgress | null>(null);
+  const [progressMessage, setProgressMessage] = useState("");
+  const [celebrationQueue, setCelebrationQueue] = useState<Celebration[]>([]);
+  const [activeCelebration, setActiveCelebration] = useState<Celebration | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -239,11 +391,13 @@ export function ChildHomePage() {
     const loadDashboardData = async () => {
       setIsLoadingMarkets(true);
       setSavingTargetMessage("");
+      setProgressMessage("");
 
-      const [marketsResponse, savedTargetId, coinsResponse] = await Promise.all([
+      const [marketsResponse, savedTargetId, coinsResponse, progressResponse] = await Promise.all([
         childrenApi.getMarkets(),
         Promise.resolve(readSavingTargetId()),
         childrenApi.getCoins(),
+        childrenApi.getProgress(),
       ]);
 
       if (coinsResponse.success && typeof coinsResponse.data === "number") {
@@ -268,11 +422,61 @@ export function ChildHomePage() {
         setSavingTarget(null);
       }
 
+      if (progressResponse.success && progressResponse.data) {
+        const nextProgress = progressResponse.data;
+        setProgress(nextProgress);
+        queueCelebrations(nextProgress);
+      } else if (progressResponse.error) {
+        setProgressMessage(progressResponse.error);
+      }
+
       setIsLoadingMarkets(false);
     };
 
     loadDashboardData();
   }, []);
+
+  useEffect(() => {
+    if (!activeCelebration && celebrationQueue.length > 0) {
+      setActiveCelebration(celebrationQueue[0]);
+      setCelebrationQueue((prev) => prev.slice(1));
+    }
+  }, [activeCelebration, celebrationQueue]);
+
+  function queueCelebrations(nextProgress: ChildProgress) {
+    if (typeof window === "undefined") return;
+
+    const snapshot = readProgressSnapshot();
+    const earnedBadges = nextProgress.badges.filter((badge) => badge.earned !== false);
+    const earnedIds = earnedBadges
+      .map((badge) => badge.id || badge.name)
+      .filter((value): value is string => Boolean(value));
+
+    if (!snapshot) {
+      saveProgressSnapshot({ level: nextProgress.level, badgeIds: earnedIds });
+      return;
+    }
+
+    const newEvents: Celebration[] = [];
+
+    if (nextProgress.level > snapshot.level) {
+      newEvents.push({ type: "level", level: nextProgress.level });
+    }
+
+    const previousBadgeIds = new Set(snapshot.badgeIds);
+    for (const badge of earnedBadges) {
+      const key = badge.id || badge.name;
+      if (key && !previousBadgeIds.has(key)) {
+        newEvents.push({ type: "badge", badge });
+      }
+    }
+
+    if (newEvents.length > 0) {
+      setCelebrationQueue((prev) => [...prev, ...newEvents]);
+    }
+
+    saveProgressSnapshot({ level: nextProgress.level, badgeIds: earnedIds });
+  }
 
   async function confirmSavingTarget() {
     const market = pendingSavingTarget;
@@ -311,6 +515,31 @@ export function ChildHomePage() {
     ? Math.min(100, Math.round((coins / savingTarget.price) * 100))
     : 0;
   const remainingTargetCoins = savingTarget ? Math.max(0, savingTarget.price - coins) : 0;
+  const progressData: ChildProgress =
+    progress ?? {
+      total_exp: 0,
+      level: 1,
+      next_level_exp: 50,
+      exp_to_next_level: 50,
+      badges: [],
+    };
+  const totalExp = progressData.total_exp;
+  const level = Math.max(1, progressData.level);
+  const nextLevelExp = progressData.next_level_exp || Math.max(50, level * 50);
+  const expToNext =
+    typeof progressData.exp_to_next_level === "number"
+      ? progressData.exp_to_next_level
+      : Math.max(0, nextLevelExp - totalExp);
+  const progressPercent = nextLevelExp > 0
+    ? Math.min(100, Math.round((totalExp / nextLevelExp) * 100))
+    : 0;
+  const expMessage =
+    expToNext > 0
+      ? `${expToNext} XP lagi untuk Level ${level + 1}!`
+      : "Level ini sudah penuh!";
+  const heroTitle = level >= 10 ? "Hampir Jadi Legenda!" : level >= 5 ? "Petualanganmu Makin Hebat!" : "Ayo Naik Level!";
+  const earnedBadges = progressData.badges.filter((badge) => badge.earned !== false);
+  const displayedBadges = earnedBadges.slice(0, 6);
 
   return (
     <main className="min-h-screen bg-[#fbf5e8] pb-10">
@@ -329,16 +558,26 @@ export function ChildHomePage() {
             />
             <div className="text-center md:text-left">
               <div className="flex justify-center md:justify-start md:pl-36">
-                <span className="-rotate-2 rounded-full bg-[#ffc400] px-7 py-2 text-[1.05rem] font-black uppercase text-[#4b3605] shadow-[0_8px_14px_rgba(104,70,0,0.16)]">Level 12</span>
+                <span className="-rotate-2 rounded-full bg-[#ffc400] px-7 py-2 text-[1.05rem] font-black uppercase text-[#4b3605] shadow-[0_8px_14px_rgba(104,70,0,0.16)]">
+                  Level {level}
+                </span>
               </div>
-              <h1 className="mt-4 text-[2.45rem] font-black leading-[1.05] sm:text-5xl">Hampir Jadi Legenda!</h1>
+              <h1 className="mt-4 text-[2.45rem] font-black leading-[1.05] sm:text-5xl">{heroTitle}</h1>
               <div className="mx-auto mt-6 max-w-[520px] rounded-full bg-[#b96d10]/60 p-1.5 md:mx-0">
                 <div className="relative h-6 overflow-hidden rounded-full bg-[#8f5709]/45">
-                  <div className="h-full w-[75%] rounded-full bg-[#ffc400] shadow-[inset_0_2px_0_rgba(255,255,255,0.38)]" />
-                  <span className="absolute inset-0 flex items-center justify-center text-[0.78rem] font-black text-[#2d2309]">750 / 1000 XP</span>
+                  <div
+                    className="h-full rounded-full bg-[#ffc400] shadow-[inset_0_2px_0_rgba(255,255,255,0.38)]"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center text-[0.78rem] font-black text-[#2d2309]">
+                    {totalExp} / {nextLevelExp} XP
+                  </span>
                 </div>
               </div>
-              <p className="mt-4 text-[1rem] font-bold">250 XP lagi untuk Level 13!</p>
+              <p className="mt-4 text-[1rem] font-bold">{expMessage}</p>
+              {progressMessage ? (
+                <p className="mt-2 text-[0.82rem] font-black text-[#ffe8b8]">{progressMessage}</p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -462,6 +701,26 @@ export function ChildHomePage() {
               <p className="mt-4 text-[1.55rem] font-black">Collected Coins</p>
               <p className="text-[4.1rem] font-black leading-none">{coins}</p>
             </div>
+            <div className="rounded-[1.35rem] border border-[#f1d4a8] bg-[#fff7e8] px-6 py-6 text-center">
+              <div className="flex items-center justify-center gap-2 text-[#f79418]">
+                <Icon name="star" className="h-5 w-5" />
+                <p className="text-[0.9rem] font-black uppercase tracking-[0.16em]">Badge</p>
+              </div>
+              {displayedBadges.length > 0 ? (
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  {displayedBadges.map((badge) => (
+                    <BadgeTile key={badge.id || badge.name} badge={badge} />
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-[0.9rem] font-black text-[#7b5d08]">Belum ada badge. Terus kumpulkan XP!</p>
+              )}
+              {earnedBadges.length > displayedBadges.length ? (
+                <p className="mt-3 text-[0.68rem] font-black uppercase tracking-[0.14em] text-[#9a7a4a]">
+                  +{earnedBadges.length - displayedBadges.length} badge lain
+                </p>
+              ) : null}
+            </div>
             <MascotImage src="/images/tomo5.png" alt="Tomo membawa kantong uang" className="mx-auto h-72 w-72" />
           </aside>
         </div>
@@ -505,6 +764,9 @@ export function ChildHomePage() {
             </div>
           </div>
         </div>
+      ) : null}
+      {activeCelebration ? (
+        <CelebrationModal celebration={activeCelebration} onClose={() => setActiveCelebration(null)} />
       ) : null}
     </main>
   );
