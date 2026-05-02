@@ -698,6 +698,35 @@ export const userApi = {
       body: JSON.stringify(userData),
     });
   },
+
+  deleteAccount: async () => {
+    const endpoints = [
+      API_CONFIG.ENDPOINTS.USER.DELETE,
+      "/api/user/delete",
+      "/api/parent/delete",
+    ];
+
+    let lastResponse: ApiResponse = { success: false, error: "Failed to delete account." };
+
+    for (const endpoint of endpoints) {
+      const response = await apiCall(endpoint, {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          ...authHeaders(),
+        },
+      });
+
+      if (response.success) return response;
+      lastResponse = response;
+
+      if (response.status && response.status !== 404 && response.status !== 405) {
+        return response;
+      }
+    }
+
+    return lastResponse;
+  },
 };
 
 /**

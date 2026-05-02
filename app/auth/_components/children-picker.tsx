@@ -16,6 +16,22 @@ interface ChildrenPickerProps {
   onClose?: () => void;
 }
 
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden>
+      <path d="M12 5c5.5 0 9.8 4.1 11 7-1.2 2.9-5.5 7-11 7S2.2 14.9 1 12c1.2-2.9 5.5-7 11-7Zm0 2C8.3 7 5.1 9.4 3.7 12 5.1 14.6 8.3 17 12 17s6.9-2.4 8.3-5C18.9 9.4 15.7 7 12 7Zm0 1.7A3.3 3.3 0 1 1 12 15a3.3 3.3 0 0 1 0-6.6Zm0 2A1.3 1.3 0 1 0 12 13a1.3 1.3 0 0 0 0-2.6Z" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden>
+      <path d="m3.3 2 18.7 18.7-1.3 1.3-3.1-3.1A12 12 0 0 1 12 20C6.5 20 2.2 15.9 1 13c.5-1.2 1.6-2.6 3.1-3.8L2 7.3 3.3 6 22 24l-1.3 1.3L3.3 8Zm2.2 8.6A10 10 0 0 0 3.7 13c1.4 2.6 4.6 5 8.3 5 1.5 0 2.9-.4 4.1-1.1l-2-2A3.3 3.3 0 0 1 10.1 11l-1.8-1.8a8.8 8.8 0 0 0-2.8 1.4Zm5.9 1.8a1.3 1.3 0 0 0 1.5 1.5l-1.5-1.5ZM12 6c5.5 0 9.8 4.1 11 7-.4 1-1.3 2.1-2.5 3.2L19.1 15c.5-.6.9-1.3 1.2-2C18.9 10.4 15.7 8 12 8c-.9 0-1.8.1-2.6.4L7.8 6.8A12 12 0 0 1 12 6Zm3.2 6.9a3.3 3.3 0 0 0-4.1-4.1l4.1 4.1Z" />
+    </svg>
+  );
+}
+
 function InputFieldSmall({
   label,
   placeholder,
@@ -31,22 +47,39 @@ function InputFieldSmall({
   onChange?: (value: string) => void;
   error?: string;
 }) {
+  const [isPinVisible, setIsPinVisible] = useState(false);
+  const isPasswordField = type === "password";
+  const inputType = isPasswordField && isPinVisible ? "text" : type;
+
   return (
     <div className="block">
       <label className="mb-2 block text-[0.84rem] font-black uppercase tracking-[0.26em] text-[#8f6519]">
         {label}
       </label>
-      <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={(event) => onChange?.(event.target.value)}
-        className={`h-12 w-full rounded-2xl border px-4 text-[0.9rem] font-semibold text-[#53443b] outline-none transition placeholder:text-[#c7bdb0] ${
-          error
-            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/14 focus:bg-red-50"
-            : "border-[#a9a2a2] bg-[#f9efdb] focus:border-[#f0a22b] focus:bg-white focus:ring-2 focus:ring-[#f0a22b]/14"
-        }`}
-      />
+      <div className="relative">
+        <input
+          type={inputType}
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange?.(event.target.value)}
+          className={`h-12 w-full rounded-2xl border px-4 text-[0.9rem] font-semibold text-[#53443b] outline-none transition placeholder:text-[#c7bdb0] ${
+            error
+              ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/14 focus:bg-red-50"
+              : "border-[#a9a2a2] bg-[#f9efdb] focus:border-[#f0a22b] focus:bg-white focus:ring-2 focus:ring-[#f0a22b]/14"
+          } ${isPasswordField ? "pr-12" : ""}`}
+        />
+        {isPasswordField ? (
+          <button
+            type="button"
+            className="absolute inset-y-0 right-3 flex w-8 items-center justify-center text-[#6b584a] transition hover:text-[#f39211] focus:outline-none focus-visible:text-[#f39211] focus-visible:ring-2 focus-visible:ring-[#f0a22b]/40"
+            onClick={() => setIsPinVisible((visible) => !visible)}
+            aria-label={isPinVisible ? "Sembunyikan PIN" : "Lihat PIN"}
+            aria-pressed={isPinVisible}
+          >
+            {isPinVisible ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
+        ) : null}
+      </div>
       {error && (
         <p className="mt-1 text-[0.75rem] font-semibold text-red-600">{error}</p>
       )}

@@ -16,6 +16,7 @@ export const API_CONFIG = {
     USER: {
       PROFILE: "/api/user/profile",
       UPDATE: "/api/parent/update",
+      DELETE: "/api/user/profile",
     },
     PARENT: {
       INFO: "/api/parent/info",

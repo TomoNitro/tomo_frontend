@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi, childrenApi, parentApi, userApi, type ChildProfile } from "@/lib/api";
 import { ChildrenPickerModal } from "@/app/auth/_components/children-picker";
+import { getChildAvatarSrc } from "@/lib/child-avatar";
+
+const PARENT_AVATAR_SRC = "/images/tomo3.png";
 
 function getInitials(name: string) {
   return name
@@ -81,6 +84,7 @@ export default function EditProfile() {
   const [statusMessage, setStatusMessage] = useState("");
   const [isAddingChild, setIsAddingChild] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeletingChildId, setIsDeletingChildId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -162,12 +166,10 @@ export default function EditProfile() {
         name: child.name,
         initial: getInitials(child.name),
         color: getChildColor(child.id || child.name),
+        avatarSrc: getChildAvatarSrc(child.id || child.name),
       })),
     [children]
   );
-
-  const displayName = parentName || "Parent";
-  const displayEmail = email || "";
 
   const handleSaveChanges = async () => {
     setStatusMessage("");
@@ -209,20 +211,32 @@ export default function EditProfile() {
   };
 
   const handleDeleteChild = async (childId: string) => {
+    setStatusMessage("");
+    setIsDeletingChildId(childId);
     const response = await childrenApi.delete(childId);
     if (!response.success) {
       setStatusMessage(response.error ?? "Failed to delete child.");
+      setIsDeletingChildId(null);
       return;
+    }
+
+    if (window.localStorage.getItem("selectedChildId") === childId) {
+      window.localStorage.removeItem("selectedChildId");
+      window.localStorage.removeItem("selectedChildName");
+      window.localStorage.removeItem("selectedUser");
     }
 
     await refreshChildren();
     setStatusMessage("Child profile deleted successfully.");
     setDeleteConfirmId(null);
+    setIsDeletingChildId(null);
   };
 
   const handleLogout = async () => {
     await authApi.logout();
     window.localStorage.removeItem("tomoAuthToken");
+    window.localStorage.removeItem("accessToken");
+    window.localStorage.removeItem("token");
     router.push("/");
   };
 
@@ -269,19 +283,13 @@ export default function EditProfile() {
               {/* Profile Picture */}
               <div className="flex flex-col items-center gap-4">
                 <div className="relative h-32 w-32 rounded-full bg-gradient-to-br from-[#f59f1b] to-[#ff8128] shadow-lg flex items-center justify-center overflow-hidden">
-                  <img src="/images/tomo3.svg" alt="Profile" className="h-full w-full object-cover" />
-                  <div className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-[#f39211] border-2 border-white flex items-center justify-center text-white text-xs font-bold">
-                    ✎
-                  </div>
+                  <img src={PARENT_AVATAR_SRC} alt="Profile" className="h-full w-full object-cover" />
                 </div>
-                <button className="rounded-full bg-[#e8d4b0] px-6 py-2 font-bold text-[#3d3128] hover:bg-[#dcc4ac] transition-colors">
-                  Change Photo
-                </button>
               </div>
 
               {/* Form Fields */}
               <div className="flex-1 space-y-6">
-                <p className="text-sm font-bold text-[#8d7661] uppercase tracking-wide">Update your profile photo and personal details</p>
+                <p className="text-sm font-bold text-[#8d7661] uppercase tracking-wide">Update your personal details</p>
 
                 <div>
                   <label className="block text-sm font-bold text-[#8d7661] mb-2 uppercase">Parent Name</label>
@@ -327,7 +335,7 @@ export default function EditProfile() {
                 <div key={child.id} className="flex items-center justify-between rounded-xl bg-gradient-to-r from-[#fffaf0] to-[#fff5e6] p-4 border border-[#e8d4b0]">
                   <div className="flex items-center gap-3">
                     <div className={`h-10 w-10 rounded-full ${child.color} flex items-center justify-center text-white font-bold text-sm`}>
-                      {child.initial}
+                      <img src={child.avatarSrc} alt={`${child.name} avatar`} className="h-full w-full object-contain" />
                     </div>
                     <span className="font-bold text-[#3d3128]">{child.name}</span>
                   </div>
@@ -336,9 +344,10 @@ export default function EditProfile() {
                       <button
                         type="button"
                         onClick={() => handleDeleteChild(child.id)}
+                        disabled={isDeletingChildId === child.id}
                         className="rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-100"
                       >
-                        Confirm
+                        {isDeletingChildId === child.id ? "Deleting..." : "Confirm"}
                       </button>
                       <button
                         type="button"
@@ -363,13 +372,6 @@ export default function EditProfile() {
               ))}
             </div>
 
-            {/* Additional Actions */}
-            <div className="mt-8 space-y-3">
-              <button className="w-full rounded-xl bg-[#f5e6d3] px-4 py-3 font-bold text-red-600 hover:bg-[#ead9c3] transition-colors flex items-center justify-center gap-2">
-                <DeleteIcon />
-                Delete Account
-              </button>
-            </div>
           </div>
         </div>
 

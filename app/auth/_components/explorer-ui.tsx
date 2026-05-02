@@ -55,6 +55,14 @@ function EyeIcon() {
   );
 }
 
+function EyeOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden>
+      <path d="m3.3 2 18.7 18.7-1.3 1.3-3.1-3.1A12 12 0 0 1 12 20C6.5 20 2.2 15.9 1 13c.5-1.2 1.6-2.6 3.1-3.8L2 7.3 3.3 6 22 24l-1.3 1.3L3.3 8Zm2.2 8.6A10 10 0 0 0 3.7 13c1.4 2.6 4.6 5 8.3 5 1.5 0 2.9-.4 4.1-1.1l-2-2A3.3 3.3 0 0 1 10.1 11l-1.8-1.8a8.8 8.8 0 0 0-2.8 1.4Zm5.9 1.8a1.3 1.3 0 0 0 1.5 1.5l-1.5-1.5ZM12 6c5.5 0 9.8 4.1 11 7-.4 1-1.3 2.1-2.5 3.2L19.1 15c.5-.6.9-1.3 1.2-2C18.9 10.4 15.7 8 12 8c-.9 0-1.8.1-2.6.4L7.8 6.8A12 12 0 0 1 12 6Zm3.2 6.9a3.3 3.3 0 0 0-4.1-4.1l4.1 4.1Z" />
+    </svg>
+  );
+}
+
 function SmallMascot({ tone }: { tone: SceneTone }) {
   const caption =
     tone === "register"
@@ -111,6 +119,10 @@ function InputField({
   onChange?: (value: string) => void;
   error?: string;
 }) {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const isPasswordField = type === "password";
+  const inputType = isPasswordField && isPasswordVisible ? "text" : type;
+
   return (
     <label className="block">
       <span className="mb-2 inline-flex items-center gap-2 text-[0.84rem] font-black uppercase tracking-[0.26em] text-[#8f6519]">
@@ -121,7 +133,7 @@ function InputField({
       </span>
       <span className="relative block">
         <input
-          type={type}
+          type={inputType}
           placeholder={placeholder}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
@@ -129,12 +141,18 @@ function InputField({
             error
               ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/14 focus:bg-red-50"
               : "border-[#a9a2a2] focus:border-[#f0a22b] focus:bg-white focus:ring-4 focus:ring-[#f0a22b]/14"
-          }`}
+          } ${isPasswordField ? "pr-14" : ""}`}
         />
-        {type === "password" ? (
-          <span className="absolute inset-y-0 right-5 flex items-center text-[#6b584a]">
-            <EyeIcon />
-          </span>
+        {isPasswordField ? (
+          <button
+            type="button"
+            className="absolute inset-y-0 right-4 flex w-9 items-center justify-center text-[#6b584a] transition hover:text-[#f39211] focus:outline-none focus-visible:text-[#f39211] focus-visible:ring-2 focus-visible:ring-[#f0a22b]/40"
+            onClick={() => setIsPasswordVisible((visible) => !visible)}
+            aria-label={isPasswordVisible ? "Sembunyikan password" : "Lihat password"}
+            aria-pressed={isPasswordVisible}
+          >
+            {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
         ) : null}
       </span>
       {error ? (
@@ -286,9 +304,6 @@ export function RegisterForm() {
 
           <div className="mt-8">
             <PrimaryAction isLoading={isSubmitting}>{"LET'S GO!"}</PrimaryAction>
-            <PrimaryAction>
-              {isSubmitting ? "SENDING..." : "LET'S GO!"}
-            </PrimaryAction>
           </div>
 
           {statusMessage ? (
@@ -401,9 +416,6 @@ export function LoginForm() {
           <div className="mt-10">
             <PrimaryAction isLoading={isSubmitting}>{"LET'S GO!"}</PrimaryAction>
           </div>
-        <div className="mt-10">
-          <PrimaryAction>{"LET'S GO!"}</PrimaryAction>
-        </div>
 
           {statusMessage ? (
             <p className="mt-4 text-center text-[0.92rem] font-semibold text-[#8b5a18]">

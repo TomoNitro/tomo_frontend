@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { childrenApi, type ChildProfile } from "@/lib/api";
 import { ChildrenPickerModal } from "@/app/auth/_components/children-picker";
@@ -9,6 +9,14 @@ export default function ProfilePickerPage() {
   const router = useRouter();
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const refreshChildren = useCallback(async () => {
+    const response = await childrenApi.getList();
+    if (response.success && Array.isArray(response.data)) {
+      setChildren(response.data);
+    }
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
     const loadChildren = async () => {
@@ -39,6 +47,7 @@ export default function ProfilePickerPage() {
     <ChildrenPickerModal
       childProfiles={children}
       onChildSelect={handleChildSelect}
+      onAddChild={refreshChildren}
       isLoadingChildren={isLoading}
     />
   );
