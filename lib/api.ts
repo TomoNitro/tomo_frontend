@@ -48,6 +48,39 @@ export interface GenerateStoryHeaderPayload {
   customPrompt: string;
 }
 
+export interface ParentChildDashboard {
+  decision_summary: {
+    wise_count: number;
+    impulsive_count: number;
+    wise_percentage: number;
+  };
+  saving_goal: {
+    goal_name: string;
+    current_coin: number;
+    target_coin: number;
+    progress_percentage: number;
+  } | null;
+  story_summary: {
+    total_completed_stories: number;
+    good_ending: number;
+    success_rate: number;
+  };
+  financial_trend: Array<{
+    date: string;
+    balance: number;
+  }>;
+  days_active: number;
+}
+
+export interface ParentChildDashboardSummary {
+  id: string;
+  child_id: string;
+  summary: string;
+  performance_level: string;
+  suggestion: string;
+  created_at: string;
+}
+
 export interface SavingGoal {
   id: string;
   market_id: string;
@@ -453,6 +486,52 @@ export const parentApi = {
         ...authHeaders(),
       },
     });
+  },
+
+  getChildDashboard: async (childId: string): Promise<ApiResponse<ParentChildDashboard>> => {
+    const endpoint = API_CONFIG.ENDPOINTS.PARENT.CHILD_DASHBOARD.replace(":childId", childId);
+    const res = await apiCall<{ message?: string; data?: ParentChildDashboard }>(endpoint, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+    });
+
+    if (!res.success) return { success: false, error: res.error };
+
+    if (res.data?.data) {
+      return { success: true, data: res.data.data };
+    }
+
+    if (isRecord(res.data)) {
+      return { success: true, data: res.data as unknown as ParentChildDashboard };
+    }
+
+    return { success: false, error: "Dashboard anak tidak valid." };
+  },
+
+  getChildDashboardSummary: async (childId: string): Promise<ApiResponse<ParentChildDashboardSummary>> => {
+    const endpoint = API_CONFIG.ENDPOINTS.PARENT.CHILD_DASHBOARD_SUMMARY.replace(":childId", childId);
+    const res = await apiCall<{ message?: string; data?: ParentChildDashboardSummary }>(endpoint, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+    });
+
+    if (!res.success) return { success: false, error: res.error };
+
+    if (res.data?.data) {
+      return { success: true, data: res.data.data };
+    }
+
+    if (isRecord(res.data)) {
+      return { success: true, data: res.data as unknown as ParentChildDashboardSummary };
+    }
+
+    return { success: false, error: "Summary dashboard anak tidak valid." };
   },
 
   getStoryHeaders: async (): Promise<ApiResponse<GeneratedStoryHeader[]>> => {
