@@ -9,6 +9,7 @@ export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+  status?: number;
 }
 
 export interface ChildProfile {
@@ -336,12 +337,14 @@ async function apiCall<T>(
       },
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
 
     if (!response.ok) {
       return {
         success: false,
         error: data.error || data.message || `HTTP ${response.status}: ${response.statusText}`,
+        status: response.status,
       };
     }
 
@@ -721,18 +724,33 @@ export const childrenApi = {
       };
     }
 
-    // Some backends expect the marketId in the POST body instead of the path.
-    const res = await apiCall<{ message?: string; data?: SavingGoal }>(
-      API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL,
-      {
-        method: "POST",
+    const endpoint = API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL;
+    const payload = JSON.stringify({ marketId, market_id: marketId });
+    const attempts: Array<{ endpoint: string; method: string }> = [
+      { endpoint, method: "POST" },
+      { endpoint, method: "PUT" },
+      { endpoint, method: "PATCH" },
+      { endpoint: `${endpoint}/${marketId}`, method: "POST" },
+      { endpoint: `${endpoint}/${marketId}`, method: "PUT" },
+      { endpoint: `${endpoint}/${marketId}`, method: "PATCH" },
+    ];
+
+    let res: ApiResponse<{ message?: string; data?: SavingGoal }> | null = null;
+
+    for (const attempt of attempts) {
+      res = await apiCall<{ message?: string; data?: SavingGoal }>(attempt.endpoint, {
+        method: attempt.method,
         credentials: "include",
         headers: {
           ...childAuthHeaders(),
         },
-        body: JSON.stringify({ marketId }),
+        body: payload,
+      });
+
+      if (res.success || (res.status !== 404 && res.status !== 405)) {
+        break;
       }
-    );
+    }
 
     if (!res.success) return { success: false, error: res.error };
 

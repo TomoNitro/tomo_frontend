@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { childrenApi, type ChildStoryHeader, type MarketItem } from "@/lib/api";
 import { getChildAvatarSrc } from "@/lib/child-avatar";
 import { readChildCoins } from "@/lib/child-coins";
-import { readSavingTargetId } from "@/lib/saving-target";
+import { readSavingTargetId, saveSavingTargetId } from "@/lib/saving-target";
 
 type ChildPage = "home" | "lessons" | "profile";
 
@@ -162,31 +162,97 @@ function MascotImage({
   );
 }
 
-function MissionRow({ icon, title, progress, reward, done = false }: { icon: "book" | "coin"; title: string; progress: string; reward: string; done?: boolean }) {
+function MissionRow({
+  icon,
+  title,
+  description,
+  progress,
+  reward,
+  done = false,
+}: {
+  icon: "book" | "coin";
+  title: string;
+  description: string;
+  progress: string;
+  reward: string;
+  done?: boolean;
+}) {
   return (
-    <div className="grid min-h-20 grid-cols-[4.5rem_1fr_auto_auto] items-center gap-4 rounded-[1.6rem] border-2 border-[#e9c4b9] bg-[#fffaf0]/80 px-5 py-4 max-md:grid-cols-[4rem_1fr] max-md:gap-y-3">
-      <div className={`flex h-16 w-16 items-center justify-center rounded-full ${done ? "bg-[#ffd29b] text-[#f99a18]" : "bg-[#ffc000] text-[#806006]"}`}>
+    <div className="grid min-h-[5.25rem] grid-cols-[4.5rem_1fr_auto_auto] items-center gap-4 rounded-[1.35rem] border border-[#eabfb6] bg-[#f8f0df]/88 px-5 py-3 max-md:grid-cols-[4rem_1fr_auto] max-md:gap-y-3">
+      <div className={`flex h-16 w-16 items-center justify-center rounded-full ${done ? "bg-[#ffd5a5] text-[#f99a18]" : "bg-[#ffc000] text-[#806006]"}`}>
         <Icon name={icon} className="h-6 w-6" />
       </div>
       <div>
-        <h3 className="text-[1.25rem] font-black leading-7 text-[#2c2921]">{title}</h3>
+        <h3 className="text-[1.1rem] font-black leading-6 text-[#2c2921]">{title}</h3>
+        <p className="mt-1 text-[0.83rem] font-bold leading-5 text-[#5d4b41]">{description}</p>
       </div>
-      <div className="text-center max-md:ml-[5.2rem] max-md:text-left">
-        <p className={`text-[1.35rem] font-black leading-none ${done ? "text-[#f5b400]" : "text-[#ff9417]"}`}>{progress}</p>
+      <div className="min-w-16 text-center max-md:hidden">
+        <p className={`text-[1.25rem] font-black leading-none ${done ? "text-[#f5b400]" : "text-[#ff9417]"}`}>{progress}</p>
+        <p className="mt-1 text-[0.58rem] font-black uppercase tracking-[0.18em] text-[#8d7661]">{done ? "Selesai" : "Progress"}</p>
       </div>
-      <div className="rounded-full bg-[#ff9a1a] px-5 py-3 text-[1.05rem] font-black text-white max-md:justify-self-end">{reward}</div>
+      <div className={`${done ? "bg-[#ffbd73]" : "bg-[#ff9a1a]"} rounded-full px-5 py-2.5 text-[0.98rem] font-black text-white max-md:justify-self-end`}>{reward}</div>
     </div>
   );
 }
 
 export function ChildHomePage() {
   const [coins, setCoins] = useState(DEFAULT_CHILD_POINTS);
+  const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
+  const [isLoadingMarkets, setIsLoadingMarkets] = useState(true);
+  const [savingTarget, setSavingTarget] = useState<MarketItem | null>(null);
+  const [isSavingTargetId, setIsSavingTargetId] = useState<string | null>(null);
+  const [savingTargetMessage, setSavingTargetMessage] = useState("");
 
   useEffect(() => {
     queueMicrotask(() => {
       setCoins(readChildCoins(DEFAULT_CHILD_POINTS));
     });
+
+    const loadMarkets = async () => {
+      setIsLoadingMarkets(true);
+      setSavingTargetMessage("");
+
+      const [marketsResponse, savedTargetId] = await Promise.all([
+        childrenApi.getMarkets(),
+        Promise.resolve(readSavingTargetId()),
+      ]);
+
+      if (marketsResponse.success && Array.isArray(marketsResponse.data)) {
+        const items = marketsResponse.data;
+        setMarketItems(items);
+
+        if (savedTargetId) {
+          setSavingTarget(items.find((item) => item.id === savedTargetId) ?? null);
+        } else {
+          setSavingTarget(null);
+        }
+      } else {
+        setMarketItems([]);
+        setSavingTarget(null);
+      }
+
+      setIsLoadingMarkets(false);
+    };
+
+    loadMarkets();
   }, []);
+
+  async function chooseSavingTarget(market: MarketItem) {
+    setIsSavingTargetId(market.id);
+    setSavingTargetMessage("");
+
+    const response = await childrenApi.setSavingGoal(market.id);
+
+    if (response.success) {
+      saveSavingTargetId(market.id);
+      setSavingTarget(market);
+      setSavingTargetMessage(`Target disimpan ke ${market.title}.`);
+    } else {
+      setSavingTargetMessage(response.error ?? "Target belum bisa disimpan.");
+    }
+
+    setIsSavingTargetId(null);
+  }
 
   return (
     <main className="min-h-screen bg-[#fbf5e8] pb-12">
@@ -211,7 +277,7 @@ export function ChildHomePage() {
                 <span className="inline-flex rounded-full bg-[#ffc400] px-6 py-2 text-[1rem] font-black text-[#4b3605] shadow-[0_8px_14px_rgba(104,70,0,0.16)]">Level 12</span>
                 <span className="rounded-full bg-white/18 px-4 py-2 text-[0.9rem] font-black">250 XP lagi</span>
               </div>
-              <h1 className="mt-4 text-4xl font-black leading-[1.1] sm:text-5xl">Naik level</h1>
+              <h1 className="mt-4 text-4xl font-black leading-[1.1] sm:text-5xl">Hampir Jadi Legenda!</h1>
               <div className="mt-6 max-w-[620px] rounded-[1.2rem] bg-[#b96d10]/58 p-3">
                 <div className="mb-2 flex items-center justify-between px-1 text-[0.9rem] font-black text-white">
                   <span>XP</span>
@@ -260,6 +326,100 @@ export function ChildHomePage() {
             </div>
             <MascotImage src="/images/tomo5.png" alt="Tomo membawa kantong uang" className="mx-auto h-80 w-80" />
           </aside>
+        </div>
+
+        <div className="mt-12 rounded-[1.8rem] bg-white border-2 border-[#e8d4b0] shadow-[0_8px_20px_rgba(179,107,8,0.1)] p-6 md:p-8">
+          <div className="bg-gradient-to-r from-[#ff704d] via-[#ff9417] to-[#fb9714] rounded-[1.2rem] px-6 py-4 mb-6 text-white shadow-[0_4px_12px_rgba(232,113,31,0.2)]">
+            <h2 className="text-2xl font-black">TOMO MARKET</h2>
+            <p className="text-[0.85rem] font-black mt-1 opacity-95">Tukarkan Koinmu untuk Membeli</p>
+          </div>
+
+          {!isLoadingMarkets && savingTarget ? (
+            <div className="mb-8 rounded-[1.8rem] bg-[#fff9e6] border-2 border-[#ffd9a3] shadow-[0_8px_20px_rgba(179,107,8,0.12)] p-6 md:p-8">
+              <p className="text-[0.8rem] font-black uppercase tracking-[0.2em] text-[#8b6914] mb-3">Target Kamu Sekarang</p>
+              <div className="flex gap-4 items-start md:items-center">
+                <div className="relative h-24 w-24 shrink-0 rounded-[1rem] bg-white">
+                  <Image
+                    src={savingTarget.image_url}
+                    alt={savingTarget.title}
+                    fill
+                    sizes="96px"
+                    className="object-contain p-2 drop-shadow-[0_8px_12px_rgba(104,61,20,0.15)]"
+                  />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-black leading-tight text-[#8b6914]">{savingTarget.title}</h3>
+                  <p className="mt-2 text-lg font-black text-[#f79316]">
+                    {coins}/{savingTarget.price} koin
+                  </p>
+                  <div className="mt-3 rounded-full bg-[#e8d4b0] p-1">
+                    <div
+                      className="h-3 rounded-full bg-gradient-to-r from-[#ffc000] to-[#ff9818] transition-all"
+                      style={{ width: `${Math.min(100, Math.round((coins / savingTarget.price) * 100))}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[0.85rem] font-bold text-[#8b6914]">
+                    {savingTarget.price - coins > 0 ? `Kurang ${savingTarget.price - coins} koin lagi` : "✨ Target siap dibuka!"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {isLoadingMarkets ? (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="animate-pulse rounded-[1.4rem] bg-[#f5ede0] p-5 text-center h-56"
+                />
+              ))}
+            </div>
+          ) : marketItems.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {marketItems.map((market) => {
+                const isActive = savingTarget?.id === market.id;
+                return (
+                  <button
+                    key={market.id}
+                    type="button"
+                    onClick={() => chooseSavingTarget(market)}
+                    disabled={isSavingTargetId === market.id}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-[1.4rem] p-4 text-center transition min-h-56 ${
+                      isActive
+                        ? "bg-gradient-to-br from-[#ff9818] to-[#ff7d0e] ring-3 ring-[#ffe071] shadow-[0_8px_24px_rgba(232,113,31,0.3)]"
+                        : "bg-gradient-to-br from-[#ff9818] to-[#ff8a2f] hover:shadow-[0_8px_20px_rgba(232,113,31,0.25)]"
+                    } shadow-[0_6px_16px_rgba(232,113,31,0.18)] text-white disabled:opacity-60 transform transition hover:scale-105`}
+                  >
+                    <div className="relative h-24 w-24 flex-shrink-0">
+                      <Image
+                        src={market.image_url}
+                        alt={market.title}
+                        fill
+                        sizes="96px"
+                        className="object-contain drop-shadow-[0_8px_12px_rgba(104,61,20,0.25)]"
+                      />
+                    </div>
+                    <div className="flex-1 flex flex-col justify-end gap-1">
+                      <h3 className="text-sm font-black leading-tight">
+                        {market.title}
+                      </h3>
+                      <p className="text-base font-black">
+                        {market.price} koin
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-[1.4rem] bg-[#f5ede0] px-6 py-12 text-center">
+              <p className="text-lg font-black text-[#8b6914]">Market belum tersedia</p>
+            </div>
+          )}
+          {savingTargetMessage ? (
+            <p className="mt-4 text-center text-sm font-black text-[#ff6845]">{savingTargetMessage}</p>
+          ) : null}
         </div>
       </section>
     </main>
@@ -445,6 +605,7 @@ export function ChildProfilePage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isSavingProfileName, setIsSavingProfileName] = useState(false);
   const [profileNameMessage, setProfileNameMessage] = useState("");
+  const [savingTargetMessage, setSavingTargetMessage] = useState("");
   const [subtitleEnabled, setSubtitleEnabled] = useState(true);
 
   useEffect(() => {
@@ -465,7 +626,26 @@ export function ChildProfilePage() {
 
     const loadSavings = async () => {
       setIsLoadingSavings(true);
-      // TODO: Implement saving goals loading
+      setSavingTargetMessage("");
+
+      const [marketsResponse, savedTargetId] = await Promise.all([
+        childrenApi.getMarkets(),
+        Promise.resolve(readSavingTargetId()),
+      ]);
+
+      if (marketsResponse.success && Array.isArray(marketsResponse.data)) {
+        const items = marketsResponse.data;
+
+        if (savedTargetId) {
+          setSavingTarget(items.find((item) => item.id === savedTargetId) ?? null);
+        } else {
+          setSavingTarget(null);
+        }
+      } else {
+        setSavingTarget(null);
+        setSavingTargetMessage(marketsResponse.error ?? "Market belum bisa dimuat.");
+      }
+
       setIsLoadingSavings(false);
     };
 
@@ -615,7 +795,12 @@ export function ChildProfilePage() {
                 </Link>
               </div>
             )}
+            {savingTargetMessage ? (
+              <p className="mt-3 text-[0.82rem] font-black text-white/90">{savingTargetMessage}</p>
+            ) : null}
           </div>
+
+
         </div>
 
         <section className="rounded-[1.8rem] border-2 border-[#ffd253] bg-[#fff0b8] px-6 py-7 text-center shadow-[0_14px_24px_rgba(116,89,47,0.07)] md:px-8">
