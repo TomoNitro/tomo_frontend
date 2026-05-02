@@ -55,18 +55,23 @@ export interface SavingGoal {
   current_coin: number;
 }
 
-const AUTH_TOKEN_KEY = "tomoAuthToken";
-<<<<<<< HEAD
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object";
+export interface MarketItem {
+  id: string;
+  title: string;
+  image_url: string;
+  price: number;
+  created_at?: string;
 }
-=======
+
+const AUTH_TOKEN_KEY = "tomoAuthToken";
 const CHILD_AUTH_TOKEN_KEY = "tomoChildAuthToken";
 const AUTH_TOKEN_FALLBACK_KEYS = ["accessToken", "token"];
 let pendingCoinsRequest: Promise<ApiResponse<number>> | null = null;
 let coinsEndpointUnavailable = false;
->>>>>>> dcffc85 (feat: implement child profile management and saving goals functionality)
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
 
 function extractToken(data: unknown): string | null {
   if (!isRecord(data)) return null;
@@ -516,8 +521,6 @@ export const childrenApi = {
       },
     });
   },
-<<<<<<< HEAD
-=======
 
   getCoins: async (): Promise<ApiResponse<number>> => {
     if (!hasChildToken()) {
@@ -601,6 +604,4 @@ export const childrenApi = {
 
     return { success: false, error: "Saving goal tidak valid." };
   },
-
->>>>>>> dcffc85 (feat: implement child profile management and saving goals functionality)
 };
