@@ -169,7 +169,12 @@ function authHeaders(): Record<string, string> {
 
 function getChildStoredToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(CHILD_AUTH_TOKEN_KEY);
+  return (
+    window.localStorage.getItem(CHILD_AUTH_TOKEN_KEY) ||
+    window.localStorage.getItem("childAccessToken") ||
+    window.localStorage.getItem("accessToken") ||
+    window.localStorage.getItem("token")
+  );
 }
 
 function childAuthHeaders(): Record<string, string> {
@@ -285,7 +290,15 @@ function getFriendlyApiError(status: number, data: unknown): string {
 }
 
 function getFriendlyNetworkError(error: unknown): string {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    const normalized = error.message.toLowerCase();
+
+    if (normalized.includes("load failed") || normalized.includes("failed to fetch")) {
+      return "Koneksi ke server gagal. Coba login anak lagi atau cek izin CORS backend.";
+    }
+
+    return error.message;
+  }
   try {
     return String(error);
   } catch {
@@ -338,19 +351,28 @@ async function apiCall<T>(
     });
 
     const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
+    let data: unknown = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { message: text };
+      }
+    }
 
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || data.message || `HTTP ${response.status}: ${response.statusText}`,
+        error:
+          (isRecord(data) && (String(data.error || data.message || ""))) ||
+          `HTTP ${response.status}: ${response.statusText}`,
         status: response.status,
       };
     }
 
     return {
       success: true,
-      data,
+      data: data as T,
     };
   } catch (error) {
     return {
@@ -684,7 +706,11 @@ export const childrenApi = {
     }
 
     pendingCoinsRequest = (async () => {
-      const res = await apiCall<{ message?: string; data?: { amount?: number } }>(
+      const res = await apiCall<{
+        message?: string;
+        amount?: number | string;
+        data?: { amount?: number | string };
+      }>(
         API_CONFIG.ENDPOINTS.CHILDREN.COINS,
         {
           method: "GET",
@@ -703,12 +729,20 @@ export const childrenApi = {
         return { success: false, error: res.error };
       }
 
-      const body = res.data as { data?: { amount?: unknown } };
-      if (typeof body?.data?.amount === "number") {
-        return { success: true, data: body.data.amount };
+      const body = res.data as { amount?: unknown; data?: { amount?: unknown } };
+      const amount = body?.data?.amount ?? body?.amount;
+      const parsedAmount =
+        typeof amount === "number"
+          ? amount
+          : typeof amount === "string"
+            ? Number(amount)
+            : Number.NaN;
+
+      if (Number.isFinite(parsedAmount)) {
+        return { success: true, data: parsedAmount };
       }
 
-      return { success: true, data: 0 };
+      return { success: false, error: "Format data koin tidak valid." };
     })();
 
     const response = await pendingCoinsRequest;
@@ -727,15 +761,16 @@ export const childrenApi = {
     const endpoint = API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL;
     const payload = JSON.stringify({ marketId, market_id: marketId });
     const attempts: Array<{ endpoint: string; method: string }> = [
-      { endpoint, method: "POST" },
-      { endpoint, method: "PUT" },
-      { endpoint, method: "PATCH" },
       { endpoint: `${endpoint}/${marketId}`, method: "POST" },
+      { endpoint, method: "POST" },
       { endpoint: `${endpoint}/${marketId}`, method: "PUT" },
-      { endpoint: `${endpoint}/${marketId}`, method: "PATCH" },
+      { endpoint, method: "PUT" },
     ];
 
-    let res: ApiResponse<{ message?: string; data?: SavingGoal }> | null = null;
+    let res: ApiResponse<{ message?: string; data?: SavingGoal }> = {
+      success: false,
+      error: "Saving goal belum bisa disimpan.",
+    };
 
     for (const attempt of attempts) {
       res = await apiCall<{ message?: string; data?: SavingGoal }>(attempt.endpoint, {
@@ -759,7 +794,21 @@ export const childrenApi = {
       return { success: true, data: body.data as SavingGoal };
     }
 
-    return { success: false, error: "Saving goal tidak valid." };
+    if (isRecord(res.data)) {
+      const directGoal = res.data as Record<string, unknown>;
+      if (directGoal.market_id || directGoal.id) {
+        return { success: true, data: directGoal as unknown as SavingGoal };
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        id: marketId,
+        market_id: marketId,
+        goal_name: "",
+      } as SavingGoal,
+    };
   },
 
 };

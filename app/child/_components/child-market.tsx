@@ -18,7 +18,6 @@ function MarketCard({
   onSelect: (item: MarketItem) => void;
 }) {
   const progress = item.price > 0 ? Math.min(100, Math.round((points / item.price) * 100)) : 100;
-  const isUnlocked = points >= item.price;
 
   return (
     <button
@@ -39,9 +38,7 @@ function MarketCard({
           alt={item.title}
           fill
           sizes="(max-width: 640px) 45vw, 180px"
-          className={`object-contain drop-shadow-[0_10px_14px_rgba(73,41,11,0.2)] ${
-            isUnlocked ? "" : "grayscale opacity-55"
-          }`}
+          className="object-contain drop-shadow-[0_10px_14px_rgba(73,41,11,0.2)]"
         />
       </div>
       <div className="mt-2 flex items-center justify-between gap-2">
@@ -58,7 +55,7 @@ function MarketCard({
       </div>
       <div className="mt-1 flex items-center justify-between text-[0.68rem] font-black text-white">
         <span>{points}/{item.price}</span>
-        <span>{isUnlocked ? "Buka" : "Belum"}</span>
+        <span>{isTarget ? "Targetmu" : "Pilih target"}</span>
       </div>
     </button>
   );
@@ -94,7 +91,7 @@ export function ChildMarket({ points }: { points: number }) {
       if (marketResponse.success) {
         setItems(marketResponse.data ?? []);
       } else {
-        setMessage(marketResponse.error ?? "Market belum bisa dimuat.");
+        setMessage(marketResponse.error ?? "Daftar target belum bisa dimuat.");
       }
 
       setIsLoading(false);
@@ -119,12 +116,14 @@ export function ChildMarket({ points }: { points: number }) {
     if (response.success) {
       const nextTargetId = response.data?.market_id ?? pendingTarget.id;
       const nextTargetName = response.data?.goal_name ?? pendingTarget.title;
-      const nextCoins = response.data?.current_coin;
       setTargetId(nextTargetId);
       saveSavingTargetId(nextTargetId);
-      if (typeof nextCoins === "number") {
-        saveChildCoins(nextCoins);
+
+      const coinsResponse = await childrenApi.getCoins();
+      if (coinsResponse.success && typeof coinsResponse.data === "number" && coinsResponse.data > 0) {
+        saveChildCoins(coinsResponse.data);
       }
+
       setMessage(`Target: ${nextTargetName}`);
       setPendingTarget(null);
     } else {
@@ -145,8 +144,8 @@ export function ChildMarket({ points }: { points: number }) {
           className="pointer-events-none absolute -right-1 -top-9 h-auto w-28 sm:w-32"
           aria-hidden
         />
-        <h2 className="text-4xl font-black leading-none">Market</h2>
-        <p className="mt-2 text-[1rem] font-black">Poin: {points}</p>
+        <h2 className="text-4xl font-black leading-none">Target Impian</h2>
+        <p className="mt-2 text-[1rem] font-black">Pilih barang yang mau ditabung</p>
       </div>
 
       {activeTarget ? (
@@ -217,17 +216,15 @@ export function ChildMarket({ points }: { points: number }) {
                 alt={pendingTarget.title}
                 fill
                 sizes="280px"
-                className={`object-contain drop-shadow-[0_12px_16px_rgba(73,41,11,0.15)] ${
-                  points >= pendingTarget.price ? "" : "grayscale opacity-60"
-                }`}
+                className="object-contain drop-shadow-[0_12px_16px_rgba(73,41,11,0.15)]"
               />
             </div>
             <h3 className="mt-4 text-3xl font-black leading-9 text-[#f79418]">{pendingTarget.title}</h3>
             <p className="mt-3 text-[1rem] font-black leading-7 text-[#5b4635]">
-              Jadi target?
+              Jadikan target tabungan?
             </p>
             <p className="mt-2 text-[0.95rem] font-black text-[#806006]">
-              {points}/{pendingTarget.price}
+              Koinmu {points} dari target {pendingTarget.price}
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3">
               <button

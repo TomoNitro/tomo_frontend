@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { childrenApi, type ChildStoryHeader, type MarketItem } from "@/lib/api";
 import { getChildAvatarSrc } from "@/lib/child-avatar";
-import { readChildCoins } from "@/lib/child-coins";
+import { readChildCoins, saveChildCoins } from "@/lib/child-coins";
 import { readSavingTargetId, saveSavingTargetId } from "@/lib/saving-target";
 
 type ChildPage = "home" | "lessons" | "profile";
@@ -200,22 +200,33 @@ export function ChildHomePage() {
   const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
   const [isLoadingMarkets, setIsLoadingMarkets] = useState(true);
   const [savingTarget, setSavingTarget] = useState<MarketItem | null>(null);
+  const [pendingSavingTarget, setPendingSavingTarget] = useState<MarketItem | null>(null);
   const [isSavingTargetId, setIsSavingTargetId] = useState<string | null>(null);
   const [savingTargetMessage, setSavingTargetMessage] = useState("");
 
   useEffect(() => {
     queueMicrotask(() => {
-      setCoins(readChildCoins(DEFAULT_CHILD_POINTS));
+      const storedCoins = readChildCoins(DEFAULT_CHILD_POINTS);
+      setCoins(storedCoins > 0 ? storedCoins : DEFAULT_CHILD_POINTS);
     });
 
-    const loadMarkets = async () => {
+    const loadDashboardData = async () => {
       setIsLoadingMarkets(true);
       setSavingTargetMessage("");
 
-      const [marketsResponse, savedTargetId] = await Promise.all([
+      const [marketsResponse, savedTargetId, coinsResponse] = await Promise.all([
         childrenApi.getMarkets(),
         Promise.resolve(readSavingTargetId()),
+        childrenApi.getCoins(),
       ]);
+
+      if (coinsResponse.success && typeof coinsResponse.data === "number") {
+        const nextCoins = coinsResponse.data > 0 ? coinsResponse.data : DEFAULT_CHILD_POINTS;
+        setCoins(nextCoins);
+        saveChildCoins(nextCoins);
+      } else if (coinsResponse.error) {
+        setSavingTargetMessage(coinsResponse.error);
+      }
 
       if (marketsResponse.success && Array.isArray(marketsResponse.data)) {
         const items = marketsResponse.data;
@@ -234,19 +245,35 @@ export function ChildHomePage() {
       setIsLoadingMarkets(false);
     };
 
-    loadMarkets();
+    loadDashboardData();
   }, []);
 
-  async function chooseSavingTarget(market: MarketItem) {
+  async function confirmSavingTarget() {
+    const market = pendingSavingTarget;
+    if (!market) return;
+
     setIsSavingTargetId(market.id);
     setSavingTargetMessage("");
 
     const response = await childrenApi.setSavingGoal(market.id);
 
     if (response.success) {
-      saveSavingTargetId(market.id);
-      setSavingTarget(market);
-      setSavingTargetMessage(`Target disimpan ke ${market.title}.`);
+      const nextTargetId = response.data?.market_id ?? market.id;
+      const nextTarget =
+        marketItems.find((item) => item.id === nextTargetId) ?? market;
+
+      saveSavingTargetId(nextTargetId);
+      setSavingTarget(nextTarget);
+
+      const coinsResponse = await childrenApi.getCoins();
+      if (coinsResponse.success && typeof coinsResponse.data === "number") {
+        const nextCoins = coinsResponse.data > 0 ? coinsResponse.data : DEFAULT_CHILD_POINTS;
+        setCoins(nextCoins);
+        saveChildCoins(nextCoins);
+      }
+
+      setSavingTargetMessage(`Target disimpan ke ${nextTarget.title}.`);
+      setPendingSavingTarget(null);
     } else {
       setSavingTargetMessage(response.error ?? "Target belum bisa disimpan.");
     }
@@ -254,174 +281,205 @@ export function ChildHomePage() {
     setIsSavingTargetId(null);
   }
 
+  const targetProgress = savingTarget?.price
+    ? Math.min(100, Math.round((coins / savingTarget.price) * 100))
+    : 0;
+  const remainingTargetCoins = savingTarget ? Math.max(0, savingTarget.price - coins) : 0;
+
   return (
-    <main className="min-h-screen bg-[#fbf5e8] pb-12">
+    <main className="min-h-screen bg-[#fbf5e8] pb-10">
       <ChildNavbar active="home" />
-      <section className="mx-auto max-w-[1160px] px-7 pt-20">
-        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#ff704d] via-[#ff9417] to-[#fb9714] px-6 py-7 text-white shadow-[0_18px_34px_rgba(120,80,26,0.16)] sm:px-8 md:px-10">
-          <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/14" />
-          <div className="absolute -bottom-16 -left-12 h-36 w-52 rounded-full bg-[#b96d10]/12" />
-          <div className="relative z-10 grid items-center gap-6 md:grid-cols-[180px_1fr]">
-            <div className="relative mx-auto h-44 w-44 md:h-48 md:w-48">
-              <div className="absolute inset-3 rounded-full bg-[#ffc400]/25 blur-2xl" />
-              <MascotImage
-                src="/images/tomo5.png"
-                alt="Tomo membawa koin"
-                className="relative h-full w-full"
-                loading="eager"
-                fetchPriority="high"
-              />
-            </div>
+      <section className="mx-auto max-w-[1060px] px-5 pt-16 sm:px-7">
+        <div className="relative mx-auto min-h-[16.25rem] overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#ff684d] via-[#ff8d18] to-[#fb9818] px-8 py-8 text-white shadow-[0_18px_34px_rgba(120,80,26,0.18)] md:px-14">
+          <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/13" />
+          <div className="absolute -bottom-16 -left-14 h-36 w-52 rounded-full bg-[#b96d10]/12" />
+          <div className="relative z-10 grid min-h-[12rem] items-center gap-5 md:grid-cols-[180px_1fr]">
+            <MascotImage
+              src="/images/tomo5.png"
+              alt="Tomo membawa koin"
+              className="mx-auto h-44 w-44 md:h-48 md:w-48"
+              loading="eager"
+              fetchPriority="high"
+            />
             <div className="text-center md:text-left">
-              <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
-                <span className="inline-flex rounded-full bg-[#ffc400] px-6 py-2 text-[1rem] font-black text-[#4b3605] shadow-[0_8px_14px_rgba(104,70,0,0.16)]">Level 12</span>
-                <span className="rounded-full bg-white/18 px-4 py-2 text-[0.9rem] font-black">250 XP lagi</span>
+              <div className="flex justify-center md:justify-start md:pl-36">
+                <span className="-rotate-2 rounded-full bg-[#ffc400] px-7 py-2 text-[1.05rem] font-black uppercase text-[#4b3605] shadow-[0_8px_14px_rgba(104,70,0,0.16)]">Level 12</span>
               </div>
-              <h1 className="mt-4 text-4xl font-black leading-[1.1] sm:text-5xl">Hampir Jadi Legenda!</h1>
-              <div className="mt-6 max-w-[620px] rounded-[1.2rem] bg-[#b96d10]/58 p-3">
-                <div className="mb-2 flex items-center justify-between px-1 text-[0.9rem] font-black text-white">
-                  <span>XP</span>
-                  <span>750 / 1000</span>
-                </div>
-                <div className="h-5 overflow-hidden rounded-full bg-[#8f5709]/50">
+              <h1 className="mt-4 text-[2.45rem] font-black leading-[1.05] sm:text-5xl">Hampir Jadi Legenda!</h1>
+              <div className="mx-auto mt-6 max-w-[520px] rounded-full bg-[#b96d10]/60 p-1.5 md:mx-0">
+                <div className="relative h-6 overflow-hidden rounded-full bg-[#8f5709]/45">
                   <div className="h-full w-[75%] rounded-full bg-[#ffc400] shadow-[inset_0_2px_0_rgba(255,255,255,0.38)]" />
+                  <span className="absolute inset-0 flex items-center justify-center text-[0.78rem] font-black text-[#2d2309]">750 / 1000 XP</span>
                 </div>
               </div>
+              <p className="mt-4 text-[1rem] font-bold">250 XP lagi untuk Level 13!</p>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 grid gap-8 lg:grid-cols-[1fr_390px]">
+        <div className="mt-12 grid items-start gap-3 lg:grid-cols-[1fr_320px] lg:gap-4">
           <div>
-            <h2 className="mb-3 text-3xl font-black text-[#765706]">Hari ini</h2>
-            <div className="space-y-3">
-              <MissionRow icon="book" title="Baca cerita" progress="0/1" reward="+10 XP" />
-              <MissionRow icon="coin" title="Tabung koin" progress="✓" reward="+5 XP" done />
+            <h2 className="mb-2 text-[1.7rem] font-black text-[#765706]">Misi Hari Ini</h2>
+            <div className="space-y-2.5">
+              <MissionRow icon="book" title="Baca 1 Cerita" description="Selesaikan satu petualangan baru hari ini!" progress="0/1" reward="+10 XP" />
+              <MissionRow icon="coin" title="Tabung 5 Koin" description="Kumpulkan koin dari latihan harian." progress="✓" reward="+5 XP" done />
+            </div>
+
+            <div className="mt-7 rounded-[1.35rem] border border-[#e6c2ae] bg-[#f8f0df]/90 p-5">
+              <div className="rounded-[0.85rem] bg-[#fa9818] px-5 py-3 text-center text-white shadow-[0_5px_8px_rgba(156,95,15,0.18)]">
+                <h2 className="text-[2.35rem] font-black leading-none">TARGET IMPIAN</h2>
+                <p className="text-[0.8rem] font-black">Pilih barang yang mau kamu tabung</p>
+              </div>
+
+              <div className="mt-4 rounded-[1rem] bg-white/75 px-4 py-4 text-[#5b4635]">
+                {savingTarget ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-[#f79418]">Target anak</p>
+                        <h3 className="truncate text-[1.15rem] font-black text-[#5b4635]">{savingTarget.title}</h3>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[#fa9818] px-3 py-1.5 text-[0.78rem] font-black text-white">
+                        {coins}/{savingTarget.price} koin
+                      </span>
+                    </div>
+                    <div className="mt-3 rounded-full bg-[#e6d8be] p-1">
+                      <div
+                        className="h-4 rounded-full bg-[#ffc400] transition-all"
+                        style={{ width: `${targetProgress}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-[0.82rem] font-black text-[#806006]">
+                      {remainingTargetCoins === 0 ? "Target sudah tercapai!" : `Kurang ${remainingTargetCoins} koin lagi`}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-center text-[0.92rem] font-black text-[#806006]">
+                    Belum ada target. Pilih salah satu barang di bawah.
+                  </p>
+                )}
+              </div>
+
+              {isLoadingMarkets ? (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div key={index} className="h-[9.4rem] animate-pulse rounded-[1rem] bg-[#fa9818]/70" />
+                  ))}
+                </div>
+              ) : marketItems.length > 0 ? (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {marketItems.slice(0, 6).map((market) => {
+                    const isActive = savingTarget?.id === market.id;
+                    return (
+                      <button
+                        key={market.id}
+                        type="button"
+                        onClick={() => setPendingSavingTarget(market)}
+                        disabled={isSavingTargetId === market.id}
+                        className={`relative flex h-[9.4rem] items-center justify-center overflow-hidden rounded-[1rem] bg-[#fa9818] p-2 text-white shadow-[0_6px_14px_rgba(232,113,31,0.18)] transition hover:-translate-y-0.5 disabled:opacity-60 ${
+                          isActive ? "ring-4 ring-[#ffc400]" : ""
+                        }`}
+                        aria-label={`Pilih target ${market.title}`}
+                      >
+                        {isActive ? (
+                          <span className="absolute left-2 top-2 z-10 rounded-full bg-white px-2.5 py-1 text-[0.68rem] font-black text-[#f79418] shadow">
+                            Target
+                          </span>
+                        ) : null}
+                        <Image
+                          src={market.image_url}
+                          alt={market.title}
+                          fill
+                          sizes="160px"
+                          className="object-contain p-2 drop-shadow-[0_8px_12px_rgba(104,61,20,0.25)]"
+                        />
+                        <span className="absolute bottom-2 right-2 rounded-full bg-white px-2.5 py-1 text-[0.72rem] font-black text-[#2d2921]">
+                          Target {market.price} koin
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-[1rem] bg-white/70 px-5 py-8 text-center text-[0.95rem] font-black text-[#755405]">
+                  Daftar target belum tersedia
+                </div>
+              )}
+
+              {savingTargetMessage ? (
+                <p className="mt-4 text-center text-sm font-black text-[#ff6845]">{savingTargetMessage}</p>
+              ) : null}
             </div>
           </div>
 
-          <aside className="space-y-8">
-            <div className="relative pt-8">
+          <aside className="space-y-8 pt-2">
+            <div className="relative pt-12">
               <Image
                 src="/images/tomonongol.png"
                 alt=""
                 width={168}
                 height={67}
-                className="pointer-events-none absolute left-1/2 top-0 z-10 h-auto w-28 -translate-x-1/2 drop-shadow-[0_10px_14px_rgba(103,60,18,0.18)]"
+                className="pointer-events-none absolute right-4 top-0 z-10 h-auto w-[9.5rem] drop-shadow-[0_10px_14px_rgba(103,60,18,0.18)]"
                 aria-hidden
               />
-              <Link href="/child/lessons" className="flex min-h-28 items-center justify-center gap-5 rounded-[2.6rem] bg-[#fa9818] px-7 pb-7 pt-10 text-center text-[#2d2924] shadow-[0_8px_0_rgba(220,126,18,0.22)] transition-transform hover:-translate-y-0.5">
-                <Icon name="book" className="h-6 w-6 text-[#2d2924]" />
-                <span className="text-3xl font-black leading-[1.16]">
-                  Lanjut
+              <Link href="/child/lessons" className="flex min-h-[8rem] items-center justify-center gap-4 rounded-[3.4rem] bg-[#fa9818] px-7 pb-5 pt-8 text-center text-white transition-transform hover:-translate-y-0.5">
+                <Icon name="book" className="h-5 w-5" />
+                <span className="text-[1.65rem] font-black leading-[1.1]">
+                  LANJUT<br />PETUALANGAN
                 </span>
               </Link>
             </div>
-            <div className="rounded-[1.6rem] bg-[#fa9818] px-8 py-8 text-center text-white">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white text-[#fa9818]">
-                <Icon name="coin" className="h-12 w-12" />
+            <div className="rounded-[1.35rem] bg-[#fa9818] px-8 py-7 text-center text-white">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#fa9818]">
+                <Icon name="coin" className="h-11 w-11" />
               </div>
-              <p className="mt-5 text-3xl font-black">Koin</p>
-              <p className="text-7xl font-black leading-none">{coins}</p>
+              <p className="mt-4 text-[1.55rem] font-black">Collected Coins</p>
+              <p className="text-[4.1rem] font-black leading-none">{coins}</p>
             </div>
-            <MascotImage src="/images/tomo5.png" alt="Tomo membawa kantong uang" className="mx-auto h-80 w-80" />
+            <MascotImage src="/images/tomo5.png" alt="Tomo membawa kantong uang" className="mx-auto h-72 w-72" />
           </aside>
         </div>
-
-        <div className="mt-12 rounded-[1.8rem] bg-white border-2 border-[#e8d4b0] shadow-[0_8px_20px_rgba(179,107,8,0.1)] p-6 md:p-8">
-          <div className="bg-gradient-to-r from-[#ff704d] via-[#ff9417] to-[#fb9714] rounded-[1.2rem] px-6 py-4 mb-6 text-white shadow-[0_4px_12px_rgba(232,113,31,0.2)]">
-            <h2 className="text-2xl font-black">TOMO MARKET</h2>
-            <p className="text-[0.85rem] font-black mt-1 opacity-95">Tukarkan Koinmu untuk Membeli</p>
-          </div>
-
-          {!isLoadingMarkets && savingTarget ? (
-            <div className="mb-8 rounded-[1.8rem] bg-[#fff9e6] border-2 border-[#ffd9a3] shadow-[0_8px_20px_rgba(179,107,8,0.12)] p-6 md:p-8">
-              <p className="text-[0.8rem] font-black uppercase tracking-[0.2em] text-[#8b6914] mb-3">Target Kamu Sekarang</p>
-              <div className="flex gap-4 items-start md:items-center">
-                <div className="relative h-24 w-24 shrink-0 rounded-[1rem] bg-white">
-                  <Image
-                    src={savingTarget.image_url}
-                    alt={savingTarget.title}
-                    fill
-                    sizes="96px"
-                    className="object-contain p-2 drop-shadow-[0_8px_12px_rgba(104,61,20,0.15)]"
-                  />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-black leading-tight text-[#8b6914]">{savingTarget.title}</h3>
-                  <p className="mt-2 text-lg font-black text-[#f79316]">
-                    {coins}/{savingTarget.price} koin
-                  </p>
-                  <div className="mt-3 rounded-full bg-[#e8d4b0] p-1">
-                    <div
-                      className="h-3 rounded-full bg-gradient-to-r from-[#ffc000] to-[#ff9818] transition-all"
-                      style={{ width: `${Math.min(100, Math.round((coins / savingTarget.price) * 100))}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-[0.85rem] font-bold text-[#8b6914]">
-                    {savingTarget.price - coins > 0 ? `Kurang ${savingTarget.price - coins} koin lagi` : "✨ Target siap dibuka!"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {isLoadingMarkets ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="animate-pulse rounded-[1.4rem] bg-[#f5ede0] p-5 text-center h-56"
-                />
-              ))}
-            </div>
-          ) : marketItems.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {marketItems.map((market) => {
-                const isActive = savingTarget?.id === market.id;
-                return (
-                  <button
-                    key={market.id}
-                    type="button"
-                    onClick={() => chooseSavingTarget(market)}
-                    disabled={isSavingTargetId === market.id}
-                    className={`flex flex-col items-center justify-center gap-2 rounded-[1.4rem] p-4 text-center transition min-h-56 ${
-                      isActive
-                        ? "bg-gradient-to-br from-[#ff9818] to-[#ff7d0e] ring-3 ring-[#ffe071] shadow-[0_8px_24px_rgba(232,113,31,0.3)]"
-                        : "bg-gradient-to-br from-[#ff9818] to-[#ff8a2f] hover:shadow-[0_8px_20px_rgba(232,113,31,0.25)]"
-                    } shadow-[0_6px_16px_rgba(232,113,31,0.18)] text-white disabled:opacity-60 transform transition hover:scale-105`}
-                  >
-                    <div className="relative h-24 w-24 flex-shrink-0">
-                      <Image
-                        src={market.image_url}
-                        alt={market.title}
-                        fill
-                        sizes="96px"
-                        className="object-contain drop-shadow-[0_8px_12px_rgba(104,61,20,0.25)]"
-                      />
-                    </div>
-                    <div className="flex-1 flex flex-col justify-end gap-1">
-                      <h3 className="text-sm font-black leading-tight">
-                        {market.title}
-                      </h3>
-                      <p className="text-base font-black">
-                        {market.price} koin
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-[1.4rem] bg-[#f5ede0] px-6 py-12 text-center">
-              <p className="text-lg font-black text-[#8b6914]">Market belum tersedia</p>
-            </div>
-          )}
-          {savingTargetMessage ? (
-            <p className="mt-4 text-center text-sm font-black text-[#ff6845]">{savingTargetMessage}</p>
-          ) : null}
-        </div>
       </section>
+
+      {pendingSavingTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2d1f12]/45 px-5">
+          <div className="relative w-full max-w-sm rounded-[1.4rem] bg-[#fffaf0] p-6 text-center shadow-[0_24px_60px_rgba(45,31,18,0.28)]">
+            <Image
+              src={pendingSavingTarget.image_url}
+              alt={pendingSavingTarget.title}
+              width={180}
+              height={140}
+              className="mx-auto h-32 w-full object-contain drop-shadow-[0_12px_16px_rgba(73,41,11,0.15)]"
+            />
+            <h3 className="mt-4 text-3xl font-black leading-9 text-[#f79418]">{pendingSavingTarget.title}</h3>
+            <p className="mt-3 text-[1rem] font-black leading-7 text-[#5b4635]">
+              Jadikan target tabungan?
+            </p>
+            <p className="mt-2 text-[0.95rem] font-black text-[#806006]">
+              Koinmu {coins} dari target {pendingSavingTarget.price}
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingSavingTarget(null)}
+                disabled={isSavingTargetId === pendingSavingTarget.id}
+                className="h-12 rounded-full bg-[#efe4cf] text-[0.9rem] font-black text-[#5b4635] disabled:opacity-60"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmSavingTarget}
+                disabled={isSavingTargetId === pendingSavingTarget.id}
+                aria-busy={isSavingTargetId === pendingSavingTarget.id}
+                className="h-12 rounded-full bg-[#fa9818] text-[0.9rem] font-black text-white shadow-[0_10px_18px_rgba(232,113,31,0.22)] transition disabled:opacity-65"
+              >
+                {isSavingTargetId === pendingSavingTarget.id ? "Menyimpan..." : "Pilih Target"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -643,7 +701,7 @@ export function ChildProfilePage() {
         }
       } else {
         setSavingTarget(null);
-        setSavingTargetMessage(marketsResponse.error ?? "Market belum bisa dimuat.");
+        setSavingTargetMessage(marketsResponse.error ?? "Daftar target belum bisa dimuat.");
       }
 
       setIsLoadingSavings(false);
@@ -791,7 +849,7 @@ export function ChildProfilePage() {
               <div className="mt-4 rounded-[1rem] bg-white/18 px-4 py-5 text-center">
                 <p className="text-[0.95rem] font-black leading-6">Belum ada target</p>
                 <Link href="/child/dashboard" className="mt-3 inline-flex rounded-full bg-white px-4 py-2 text-[0.82rem] font-black text-[#f79316]">
-                  Pilih di Market
+                  Pilih Target
                 </Link>
               </div>
             )}

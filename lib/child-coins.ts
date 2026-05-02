@@ -10,10 +10,11 @@ export function readChildCoins(fallback: number) {
   if (typeof window === "undefined") return fallback;
   const storedValue = window.localStorage.getItem(getChildCoinsKey());
   const parsedValue = storedValue ? Number(storedValue) : Number.NaN;
-  return Number.isFinite(parsedValue) ? parsedValue : fallback;
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
 }
 
 export function saveChildCoins(amount: number) {
   if (typeof window === "undefined") return;
+  if (!Number.isFinite(amount) || amount <= 0) return;
   window.localStorage.setItem(getChildCoinsKey(), String(amount));
 }
