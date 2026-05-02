@@ -60,21 +60,21 @@ export function validatePassword(password: string): string | null {
     return "Password tidak boleh kosong";
   }
 
-  if (password.length < 8) {
-    return "Password minimal 8 karakter";
+  if (password.length < 6) {
+    return "Password minimal 6 karakter";
   }
 
   if (password.length > 50) {
     return "Password maksimal 50 karakter";
   }
 
-  const hasUpperCase = /[A-Z]/.test(password);
-  const hasLowerCase = /[a-z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
+  // const hasUpperCase = /[A-Z]/.test(password);
+  // const hasLowerCase = /[a-z]/.test(password);
+  // const hasNumber = /[0-9]/.test(password);
 
-  if (!hasUpperCase || !hasLowerCase || !hasNumber) {
-    return "Password harus mengandung huruf besar, huruf kecil, dan angka";
-  }
+  // if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+  //   return "Password harus mengandung huruf besar, huruf kecil, dan angka";
+  // }
 
   return null;
 }

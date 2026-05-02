@@ -18,8 +18,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "A valid email address is required." }, { status: 400 });
     }
 
-    if (password.length < 8) {
-      return Response.json({ error: "Password must be at least 8 characters long." }, { status: 400 });
+    if (password.length < 6) {
+      return Response.json({ error: "Password must be at least 6 characters long." }, { status: 400 });
     }
 
     return Response.json(
