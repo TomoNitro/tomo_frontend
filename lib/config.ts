@@ -31,10 +31,17 @@ export const API_CONFIG = {
       UPDATE_NAME: "/api/children/name",
       GET_LIST: "/api/children",
       STORY_HEADERS: "/api/children/story-headers",
+      START_STORY: "/api/children/stories/:storyId/start",
+      STORY_NODE_AUDIO: "/api/children/story-nodes/:nodeId/audio/generate",
       DELETE: "/api/children/:id",
       MARKETS: "/api/children/markets",
       COINS: "/api/children/coins",
       SAVING_GOAL: "/api/children/saving-goal",
+    },
+    SESSIONS: {
+      DECISION: "/api/sessions/:sessionId/decision",
+      SUMMARY: "/api/sessions/:sessionId/summary",
+      SUMMARY_GENERATE: "/api/sessions/:sessionId/summary/generate",
     },
   },
 };
