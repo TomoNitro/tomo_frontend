@@ -12,6 +12,16 @@ import {
 } from "@/lib/validation";
 
 type SceneTone = "wave" | "register" | "login";
+type RegisterResponseData = {
+  user?: {
+    username?: unknown;
+    email?: unknown;
+  };
+  data?: {
+    username?: unknown;
+    email?: unknown;
+  };
+};
 
 function FieldIcon({ kind }: { kind: "user" | "mail" | "lock" }) {
   if (kind === "user") {
@@ -212,7 +222,7 @@ export function RegisterForm() {
     if (!response.success) {
       setStatusMessage(response.error ?? "Akun belum bisa dibuat. Silakan coba lagi.");
     } else {
-      const responseData = response.data as Record<string, any> | undefined;
+      const responseData = response.data as RegisterResponseData | undefined;
       const sender = responseData?.user ?? responseData?.data ?? {};
       const savedName = typeof sender.username === "string" ? sender.username.trim() : username;
       const savedEmail = typeof sender.email === "string" ? sender.email.trim() : email;
@@ -341,6 +351,7 @@ export function LoginForm() {
       return;
     }
 
+    setErrors({});
     const response = await authApi.login(email, password);
 
     if (!response.success) {
@@ -388,7 +399,7 @@ export function LoginForm() {
           </div>
 
           <div className="mt-10">
-            <PrimaryAction isLoading={isSubmitting}>LET'S GO!</PrimaryAction>
+            <PrimaryAction isLoading={isSubmitting}>{"LET'S GO!"}</PrimaryAction>
           </div>
         <div className="mt-10">
           <PrimaryAction>LET'S GO!</PrimaryAction>

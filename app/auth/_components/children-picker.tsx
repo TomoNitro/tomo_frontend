@@ -370,7 +370,7 @@ export function ChildrenPickerModal({
             </div>
 
             {/* Children Avatars */}
-            {childrenList.map((childName) => (
+            {childProfiles.map((childName) => (
               <div key={childName.id} className="flex justify-center">
                 <ProfileCard
                   name={childName.name}

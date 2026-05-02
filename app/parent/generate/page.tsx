@@ -167,7 +167,7 @@ export default function ParentGeneratePage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#fffaf0] via-[#fff5e6] to-[#ffe8cc]">
-      <header className="sticky top-0 z-40 border-b border-[#e8d4b0] bg-white/50 backdrop-blur-sm">
+      <header className="border-b border-[#e8d4b0] bg-white/50 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 sm:px-10 lg:px-14">
           <h1 className="text-2xl font-black text-[#f39211]">TOMO</h1>
           <nav className="flex items-center gap-8">

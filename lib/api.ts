@@ -91,7 +91,10 @@ function extractToken(data: unknown): string | null {
 function storeTokenFromResponse(data: unknown) {
   if (typeof window === "undefined") return;
   const t = extractToken(data);
-  if (t) window.localStorage.setItem(AUTH_TOKEN_KEY, t);
+  if (t) {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, t);
+    window.localStorage.setItem("accessToken", t);
+  }
 }
 
 function storeParentProfileFromResponse(data: unknown) {
@@ -99,31 +102,48 @@ function storeParentProfileFromResponse(data: unknown) {
 
   const source = isRecord(data.user) ? data.user : isRecord(data.data) ? data.data : data;
 
-  const name = source.username ?? source.name ?? source.fullName;
-  const email = source.email;
+  const name =
+    (src && (src.username || src.name || src.fullName || src.full_name)) || "";
+  const email = (src && (src.email || "")) || "";
+  const id = (src && (src.id || src._id || src.parentId)) || "";
 
-  if (typeof name === "string" && name.trim()) {
-    window.localStorage.setItem("tomoParentName", name.trim());
-  }
-
-  if (typeof email === "string" && email.trim()) {
-    window.localStorage.setItem("tomoParentEmail", email.trim());
-  }
-
-  if ((typeof name === "string" && name.trim()) || (typeof email === "string" && email.trim())) {
-    window.localStorage.setItem(
-      "tomoParentProfile",
-      JSON.stringify({
-        name: typeof name === "string" ? name.trim() : "",
-        email: typeof email === "string" ? email.trim() : "",
-      })
-    );
+  try {
+    if (typeof name === "string" && name.trim()) {
+      window.localStorage.setItem("tomoParentName", name.trim());
+    }
+    if (typeof email === "string" && email.trim()) {
+      window.localStorage.setItem("tomoParentEmail", email.trim());
+    }
+    const profileObj = { id: id || null, name: name || null, email: email || null };
+    window.localStorage.setItem("tomoParentProfile", JSON.stringify(profileObj));
+  } catch {
+    // ignore storage errors
   }
 }
 
-function getStoredToken(): string | null {
+function storeChildTokenFromResponse(data: unknown) {
+  if (typeof window === "undefined") return;
+  const t = extractToken(data);
+  if (t) {
+    window.localStorage.setItem(CHILD_AUTH_TOKEN_KEY, t);
+    window.localStorage.setItem("childAccessToken", t);
+  }
+}
+
+function clearChildToken() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(CHILD_AUTH_TOKEN_KEY);
+  window.localStorage.removeItem("childAccessToken");
+}
+
+function getStoredToken(extraKeys: string[] = []): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+  return (
+    [AUTH_TOKEN_KEY, ...extraKeys, ...AUTH_TOKEN_FALLBACK_KEYS]
+      .map((key) => window.localStorage.getItem(key))
+      .find(Boolean) ||
+    null
+  );
 }
 
 function authHeaders(): Record<string, string> {
@@ -291,7 +311,7 @@ async function apiCall<T>(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
+      error: getFriendlyNetworkError(error),
     };
   }
 }
@@ -460,11 +480,46 @@ export const childrenApi = {
   },
 
   login: async (childId: string, pin: string) => {
-    return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.LOGIN, {
+    const res = await apiCall(API_CONFIG.ENDPOINTS.CHILDREN.LOGIN, {
       method: "POST",
       credentials: "include",
       body: JSON.stringify({ childId, pin }),
     });
+    if (res.success) {
+      clearChildToken();
+      storeChildTokenFromResponse(res.data);
+    }
+    return res;
+  },
+
+  updateName: async (name: string): Promise<ApiResponse<ChildProfile>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const res = await apiCall<{ message?: string; data?: ChildProfile }>(
+      API_CONFIG.ENDPOINTS.CHILDREN.UPDATE_NAME,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+        body: JSON.stringify({ name }),
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const body = res.data as { data?: unknown };
+    if (body?.data && typeof body.data === "object") {
+      return { success: true, data: body.data as ChildProfile };
+    }
+
+    return { success: false, error: "Profile anak tidak valid." };
   },
 
   updateName: async (name: string): Promise<ApiResponse<ChildProfile>> => {
@@ -525,15 +580,120 @@ export const childrenApi = {
     return { success: true, data: [] };
   },
 
-  delete: async (childId: string) => {
-    const endpoint = API_CONFIG.ENDPOINTS.CHILDREN.DELETE.replace(":id", childId);
-    return apiCall(endpoint, {
-      method: "DELETE",
-      credentials: "include",
-      headers: {
-        ...authHeaders(),
-      },
-    });
+  getMarkets: async (): Promise<ApiResponse<MarketItem[]>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const res = await apiCall<{ message?: string; data?: MarketItem[] }>(
+      API_CONFIG.ENDPOINTS.CHILDREN.MARKETS,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const body = res.data as { data?: unknown };
+    if (Array.isArray(body?.data)) {
+      return { success: true, data: body.data as MarketItem[] };
+    }
+
+    if (Array.isArray(res.data)) {
+      return { success: true, data: res.data as MarketItem[] };
+    }
+
+    return { success: true, data: [] };
+  },
+
+  getCoins: async (): Promise<ApiResponse<number>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    if (coinsEndpointUnavailable) {
+      return {
+        success: false,
+        error: "Data koin anak belum tersedia.",
+      };
+    }
+
+    if (pendingCoinsRequest) {
+      return pendingCoinsRequest;
+    }
+
+    pendingCoinsRequest = (async () => {
+      const res = await apiCall<{ message?: string; data?: { amount?: number } }>(
+        API_CONFIG.ENDPOINTS.CHILDREN.COINS,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            ...childAuthHeaders(),
+          },
+        }
+      );
+
+      if (!res.success) {
+        if (res.error?.includes("HTTP 404")) {
+          coinsEndpointUnavailable = true;
+        }
+
+        return { success: false, error: res.error };
+      }
+
+      const body = res.data as { data?: { amount?: unknown } };
+      if (typeof body?.data?.amount === "number") {
+        return { success: true, data: body.data.amount };
+      }
+
+      return { success: true, data: 0 };
+    })();
+
+    const response = await pendingCoinsRequest;
+    pendingCoinsRequest = null;
+    return response;
+  },
+
+  setSavingGoal: async (marketId: string): Promise<ApiResponse<SavingGoal>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    // Some backends expect the marketId in the POST body instead of the path.
+    const res = await apiCall<{ message?: string; data?: SavingGoal }>(
+      API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+        body: JSON.stringify({ marketId }),
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const body = res.data as { data?: unknown };
+    if (body?.data && typeof body.data === "object") {
+      return { success: true, data: body.data as SavingGoal };
+    }
+
+    return { success: false, error: "Saving goal tidak valid." };
   },
 
   getCoins: async (): Promise<ApiResponse<number>> => {
