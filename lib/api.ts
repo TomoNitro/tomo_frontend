@@ -33,6 +33,14 @@ export interface SavingGoal {
   current_coin: number;
 }
 
+export interface ChildStoryHeader {
+  id: string;
+  title: string;
+  fullStory: string;
+  topic?: string;
+  created_at?: string;
+}
+
 const AUTH_TOKEN_KEY = "tomoAuthToken";
 const CHILD_AUTH_TOKEN_KEY = "tomoChildAuthToken";
 const AUTH_TOKEN_FALLBACK_KEYS = ["accessToken", "token"];
@@ -66,13 +74,19 @@ function storeTokenFromResponse(data: unknown) {
 function storeParentProfileFromResponse(data: unknown) {
   if (typeof window === "undefined") return;
   if (!data || typeof data !== "object") return;
-  const d = data as any;
-  const src = d.user || d.data || d.profile || d.parent || d;
+  const d = data as Record<string, unknown>;
+  const src =
+    (d.user && typeof d.user === "object" ? d.user : null) ||
+    (d.data && typeof d.data === "object" ? d.data : null) ||
+    (d.profile && typeof d.profile === "object" ? d.profile : null) ||
+    (d.parent && typeof d.parent === "object" ? d.parent : null) ||
+    d;
+  const source = src as Record<string, unknown>;
 
   const name =
-    (src && (src.username || src.name || src.fullName || src.full_name)) || "";
-  const email = (src && (src.email || "")) || "";
-  const id = (src && (src.id || src._id || src.parentId)) || "";
+    (source.username || source.name || source.fullName || source.full_name) || "";
+  const email = source.email || "";
+  const id = source.id || source._id || source.parentId || "";
 
   try {
     if (typeof name === "string" && name.trim()) {
@@ -165,6 +179,67 @@ function getFriendlyNetworkError(error: unknown): string {
   } catch {
     return "Network error";
   }
+}
+
+function getStringField(source: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function extractArray(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return [];
+
+  const record = data as Record<string, unknown>;
+  const candidates = [
+    record.data,
+    record.storyHeaders,
+    record.story_headers,
+    record.stories,
+    record.items,
+    record.results,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  if (record.data && typeof record.data === "object") {
+    return extractArray(record.data);
+  }
+
+  return [];
+}
+
+function normalizeChildStoryHeader(item: unknown): ChildStoryHeader | null {
+  if (!item || typeof item !== "object") return null;
+
+  const source = item as Record<string, unknown>;
+  const nestedStory =
+    source.story && typeof source.story === "object"
+      ? (source.story as Record<string, unknown>)
+      : source;
+  const title =
+    getStringField(nestedStory, ["title", "storyTitle", "name"]) ||
+    getStringField(source, ["title", "storyTitle", "name"]);
+  const fullStory =
+    getStringField(nestedStory, ["fullStory", "full_story", "story", "content", "description"]) ||
+    getStringField(source, ["fullStory", "full_story", "story", "content", "description"]);
+
+  if (!title && !fullStory) return null;
+
+  return {
+    id: getStringField(source, ["id", "_id", "storyHeaderId"]) || `${title}-${fullStory}`,
+    title: title || "Untitled Story",
+    fullStory,
+    topic: getStringField(source, ["topic"]) || getStringField(nestedStory, ["topic"]),
+    created_at: getStringField(source, ["created_at", "createdAt"]),
+  };
 }
 
 /**
@@ -365,6 +440,32 @@ export const childrenApi = {
     }
 
     return { success: true, data: [] };
+  },
+
+  getStoryHeaders: async (): Promise<ApiResponse<ChildStoryHeader[]>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const res = await apiCall(API_CONFIG.ENDPOINTS.CHILDREN.STORY_HEADERS, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...childAuthHeaders(),
+      },
+    });
+
+    if (!res.success) return { success: false, error: res.error };
+
+    return {
+      success: true,
+      data: extractArray(res.data)
+        .map(normalizeChildStoryHeader)
+        .filter((story): story is ChildStoryHeader => Boolean(story)),
+    };
   },
 
   getMarkets: async (): Promise<ApiResponse<MarketItem[]>> => {

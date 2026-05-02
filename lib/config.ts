@@ -25,6 +25,7 @@ export const API_CONFIG = {
       LOGIN: "/api/children/login",
       UPDATE_NAME: "/api/children/name",
       GET_LIST: "/api/children",
+      STORY_HEADERS: "/api/children/story-headers",
       MARKETS: "/api/children/markets",
       COINS: "/api/children/coins",
       SAVING_GOAL: "/api/children/saving-goal",
