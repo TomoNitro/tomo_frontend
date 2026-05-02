@@ -747,7 +747,30 @@ export const parentApi = {
       },
     });
 
-    if (!res.success) return { success: false, error: res.error };
+    if (!res.success) return { success: false, error: res.error, status: res.status };
+
+    if (res.data?.data) {
+      return { success: true, data: res.data.data };
+    }
+
+    if (isRecord(res.data)) {
+      return { success: true, data: res.data as unknown as ParentChildDashboardSummary };
+    }
+
+    return { success: false, error: "Summary dashboard anak tidak valid." };
+  },
+
+  generateChildDashboardSummary: async (childId: string): Promise<ApiResponse<ParentChildDashboardSummary>> => {
+    const endpoint = API_CONFIG.ENDPOINTS.PARENT.GENERATE_CHILD_DASHBOARD_SUMMARY.replace(":childId", childId);
+    const res = await apiCall<{ message?: string; data?: ParentChildDashboardSummary }>(endpoint, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+    });
+
+    if (!res.success) return { success: false, error: res.error, status: res.status };
 
     if (res.data?.data) {
       return { success: true, data: res.data.data };
