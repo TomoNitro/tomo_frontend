@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi, childrenApi, parentApi, userApi, type ChildProfile } from "@/lib/api";
@@ -176,14 +176,54 @@ export default function EditProfile() {
       email,
     });
 
-  const children = [
-    { id: 1, name: "Leo", initial: "L", color: "bg-gradient-to-br from-slate-600 to-slate-800" },
-    { id: 2, name: "Maya", initial: "M", color: "bg-gradient-to-br from-[#f59f1b] to-[#ff8128]" },
-  ];
+    if (!response.success) {
+      setStatusMessage(response.error ?? "Failed to save profile.");
+      return;
+    }
 
-  const handleSaveChanges = () => {
-    // API call to save
+    const updatedProfile = response.data as { data?: { username?: string; email?: string }; username?: string; email?: string } | undefined;
+    const savedName = updatedProfile?.data?.username ?? updatedProfile?.username ?? parentName;
+    const savedEmail = updatedProfile?.data?.email ?? updatedProfile?.email ?? email;
+
+    window.localStorage.setItem("tomoParentName", savedName);
+    window.localStorage.setItem("tomoParentEmail", savedEmail);
+    window.localStorage.setItem(
+      "tomoParentProfile",
+      JSON.stringify({
+        name: savedName,
+        email: savedEmail,
+      })
+    );
+
+    setParentName(savedName);
+    setEmail(savedEmail);
     setIsEditing(false);
+    setStatusMessage("Profile saved successfully.");
+  };
+
+  const refreshChildren = async () => {
+    const response = await childrenApi.getList();
+    if (response.success && Array.isArray(response.data)) {
+      setChildren(response.data);
+    }
+  };
+
+  const handleDeleteChild = async (childId: string) => {
+    const response = await childrenApi.delete(childId);
+    if (!response.success) {
+      setStatusMessage(response.error ?? "Failed to delete child.");
+      return;
+    }
+
+    await refreshChildren();
+    setStatusMessage("Child profile deleted successfully.");
+    setDeleteConfirmId(null);
+  };
+
+  const handleLogout = async () => {
+    await authApi.logout();
+    window.localStorage.removeItem("tomoAuthToken");
+    router.push("/");
   };
 
   return (
@@ -213,6 +253,12 @@ export default function EditProfile() {
           <h1 className="text-4xl font-black text-[#f39211] mb-2">Edit Profile</h1>
           <p className="text-lg text-[#8d7661]">Customize your expedition experience</p>
         </div>
+
+        {statusMessage ? (
+          <div className="mb-6 rounded-2xl border border-[#e8d4b0] bg-white/60 px-4 py-3 text-sm font-semibold text-[#8b5a18] backdrop-blur-sm">
+            {statusMessage}
+          </div>
+        ) : null}
 
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Expedition Leader Section */}
@@ -259,16 +305,6 @@ export default function EditProfile() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-[#8d7661] mb-2 uppercase">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={!isEditing}
-                    className="w-full rounded-xl bg-[#f9efdb] px-4 py-3 text-[#3d3128] font-semibold border border-[#e8d4b0] disabled:opacity-60 focus:border-[#f39211] focus:outline-none focus:ring-2 focus:ring-[#f39211]/20"
-                  />
-                </div>
               </div>
             </div>
           </div>
@@ -277,13 +313,17 @@ export default function EditProfile() {
           <div className="rounded-3xl bg-white/60 backdrop-blur-sm border border-[#e8d4b0] p-8">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-black text-[#3d3128]">Young Explorers</h3>
-              <button className="h-8 w-8 rounded-full bg-[#f39211] text-white flex items-center justify-center font-bold hover:bg-[#ff8128] transition-colors">
+              <button
+                type="button"
+                onClick={() => setIsAddingChild(true)}
+                className="h-8 w-8 rounded-full bg-[#f39211] text-white flex items-center justify-center font-bold hover:bg-[#ff8128] transition-colors"
+              >
                 +
               </button>
             </div>
 
             <div className="space-y-3">
-              {children.map((child) => (
+              {childCards.map((child) => (
                 <div key={child.id} className="flex items-center justify-between rounded-xl bg-gradient-to-r from-[#fffaf0] to-[#fff5e6] p-4 border border-[#e8d4b0]">
                   <div className="flex items-center gap-3">
                     <div className={`h-10 w-10 rounded-full ${child.color} flex items-center justify-center text-white font-bold text-sm`}>
@@ -291,9 +331,34 @@ export default function EditProfile() {
                     </div>
                     <span className="font-bold text-[#3d3128]">{child.name}</span>
                   </div>
-                  <button className="text-red-500 hover:text-red-700 font-bold text-lg">
-                    🗑️
-                  </button>
+                  {deleteConfirmId === child.id ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteChild(child.id)}
+                        className="rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-100"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmId(null)}
+                        className="rounded-xl bg-[#f5e6d3] px-3 py-2 text-sm font-bold text-[#8d7661] hover:bg-[#ead9c3]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmId(child.id)}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#f5e6d3] px-4 py-3 font-bold text-red-600 transition-colors hover:bg-[#ead9c3]"
+                      title="Delete child profile"
+                    >
+                      <DeleteIcon />
+                      Delete
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -309,19 +374,35 @@ export default function EditProfile() {
         </div>
 
         {/* Bottom Buttons */}
-        <div className="mt-12 flex justify-end gap-4">
+        <div className="mt-12 flex flex-col justify-between gap-4 sm:flex-row">
           <button
-            onClick={() => setIsEditing(false)}
-            className="rounded-full px-8 py-3 font-bold text-[#8d7661] hover:text-[#3d3128] transition-colors"
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-8 py-3 font-bold text-red-600 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100 hover:text-red-700"
           >
-            Cancel Changes
+            <LogoutIcon />
+            Logout
           </button>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="rounded-full bg-gradient-to-r from-[#f59f1b] to-[#ff8128] px-8 py-3 font-bold text-white shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
-          >
-            🔒 {isEditing ? "Save Changes" : "Edit Profile"}
-          </button>
+          <div className="flex justify-end gap-4">
+            {isEditing ? (
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="rounded-full px-8 py-3 font-bold text-[#8d7661] hover:text-[#3d3128] transition-colors"
+              >
+                Cancel Changes
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => (isEditing ? handleSaveChanges() : setIsEditing(true))}
+              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#f59f1b] to-[#ff8128] px-8 py-3 font-bold text-white shadow-lg transition-all hover:shadow-xl"
+              disabled={isLoading}
+            >
+              {isEditing ? <SaveIcon /> : <EditIcon />}
+              {isEditing ? "Save Changes" : "Edit Profile"}
+            </button>
+          </div>
         </div>
       </div>
 
