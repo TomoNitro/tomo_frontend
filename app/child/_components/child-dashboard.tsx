@@ -8,7 +8,6 @@ import { childrenApi, type MarketItem } from "@/lib/api";
 import { getChildAvatarSrc } from "@/lib/child-avatar";
 import { readChildCoins } from "@/lib/child-coins";
 import { readSavingTargetId } from "@/lib/saving-target";
-import { ChildMarket } from "./child-market";
 
 type ChildPage = "home" | "lessons" | "profile";
 
@@ -233,8 +232,6 @@ export function ChildHomePage() {
               <MissionRow icon="book" title="Baca cerita" progress="0/1" reward="+10 XP" />
               <MissionRow icon="coin" title="Tabung koin" progress="✓" reward="+5 XP" done />
             </div>
-
-            <ChildMarket points={coins} />
           </div>
 
           <aside className="space-y-8">
@@ -421,15 +418,7 @@ export function ChildProfilePage() {
 
     const loadSavings = async () => {
       setIsLoadingSavings(true);
-      const targetId = readSavingTargetId();
-      const marketResponse = await childrenApi.getMarkets();
-
-      if (targetId && marketResponse.success) {
-        setSavingTarget(
-          (marketResponse.data ?? []).find((item) => item.id === targetId) ?? null
-        );
-      }
-
+      // TODO: Implement saving goals loading
       setIsLoadingSavings(false);
     };
 
