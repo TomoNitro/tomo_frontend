@@ -1221,34 +1221,34 @@ export function ChildStoryPlayerPage() {
         {!node ? (
           <div className="mt-8 min-h-[18rem] animate-pulse rounded-[1.5rem] bg-[#eee3ca]" />
         ) : isEnd ? (
-          <div className="mx-auto max-w-[920px] pt-12">
-            <div className="relative min-h-[30rem] overflow-hidden rounded-[1.5rem] bg-[#1e2c25] px-9 py-10 shadow-[0_18px_34px_rgba(86,59,25,0.16)]">
+          <div className="mx-auto max-w-[980px] pt-10">
+            <div className="relative overflow-hidden rounded-[1.5rem] bg-[#1e2c25] px-6 py-7 shadow-[0_18px_34px_rgba(86,59,25,0.16)] sm:px-8 sm:py-9 lg:min-h-[30rem]">
               {nodeImage ? (
                 <img src={nodeImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
               ) : null}
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,22,20,.86),rgba(18,22,20,.32)_58%,rgba(18,22,20,.62)),linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.72))]" />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,22,20,.9),rgba(18,22,20,.62)_54%,rgba(18,22,20,.42)),linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,.78))]" />
               <button
                 type="button"
                 onClick={playNodeAudio}
                 disabled={isAudioLoading}
-                className="absolute left-7 top-7 z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#fa9818] text-white shadow-[0_14px_28px_rgba(56,37,13,0.2)]"
+                className="absolute right-5 top-5 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-[#fa9818] text-white shadow-[0_14px_28px_rgba(56,37,13,0.2)] sm:h-16 sm:w-16"
                 aria-label="Putar suara akhir cerita"
               >
-                {isAudioLoading ? <span className="h-8 w-8 animate-spin rounded-full border-4 border-white/45 border-t-white" /> : <Icon name="speaker" className="h-10 w-10" />}
+                {isAudioLoading ? <span className="h-7 w-7 animate-spin rounded-full border-4 border-white/45 border-t-white" /> : <Icon name="speaker" className="h-8 w-8" />}
               </button>
-              <div className="relative z-10 flex min-h-[24rem] items-end">
-                <div className="max-w-[760px]">
-                  <span className="rounded-full bg-[#ffc400] px-4 py-1 text-[0.72rem] font-black uppercase tracking-[0.16em] text-[#4d3906]">Cerita selesai</span>
+              <div className="relative z-10 flex min-h-[30rem] items-end pt-16 sm:min-h-[28rem] lg:min-h-[24rem]">
+                <div className="w-full max-w-[680px] lg:max-w-[620px]">
+                  <span className="inline-flex rounded-full bg-[#ffc400] px-4 py-1 text-[0.72rem] font-black uppercase tracking-[0.16em] text-[#4d3906]">Cerita selesai</span>
                   {summaryTitle ? (
-                    <p className="mt-4 text-[0.92rem] font-black uppercase tracking-[0.16em] text-[#ffc400]">
+                    <p className="mt-4 max-w-[min(100%,42rem)] text-[0.78rem] font-black uppercase leading-6 tracking-[0.16em] text-[#ffc400] sm:text-[0.86rem]">
                       {finalTitle}
                     </p>
                   ) : null}
-                  <h1 className="mt-4 text-[clamp(1.7rem,3.4vw,3.6rem)] font-black leading-tight text-white drop-shadow-[0_3px_10px_rgba(0,0,0,.5)]">
+                  <h1 className="mt-4 max-w-[min(100%,42rem)] text-[clamp(1.65rem,4vw,2.75rem)] font-black leading-[1.12] text-white drop-shadow-[0_3px_10px_rgba(0,0,0,.5)]">
                     {isSummaryLoading ? "Menyusun rangkuman cerita..." : finalText}
                   </h1>
-                  <div className="mt-8 grid max-w-sm grid-cols-2 gap-0">
-                    <div className="rounded-l-[1rem] bg-white px-6 py-5 text-center shadow-[0_12px_20px_rgba(103,78,38,0.1)]">
+                  <div className="mt-7 grid max-w-[24rem] grid-cols-2 overflow-hidden rounded-[1rem] bg-white shadow-[0_12px_20px_rgba(103,78,38,0.1)]">
+                    <div className="px-4 py-4 text-center sm:px-6 sm:py-5">
                       <Icon name="star" className="mx-auto h-8 w-8 text-[#fa9818]" />
                       <p className="mt-2 text-[1rem] font-black text-[#5b4635]">
                         {typeof storyReward?.exp === "number" ? `+${storyReward.exp} XP` : "XP"}
@@ -1257,7 +1257,7 @@ export function ChildStoryPlayerPage() {
                         <p className="mt-1 text-[0.72rem] font-black text-[#806006]">Level {storyReward.level}</p>
                       ) : null}
                     </div>
-                    <div className="rounded-r-[1rem] bg-white px-6 py-5 text-center shadow-[0_12px_20px_rgba(103,78,38,0.1)]">
+                    <div className="border-l border-[#f0e7d9] px-4 py-4 text-center sm:px-6 sm:py-5">
                       <Icon name="coin" className="mx-auto h-8 w-8 text-[#ffc400]" />
                       <p className="mt-2 text-[1rem] font-black text-[#5b4635]">
                         {typeof storyReward?.coins === "number" ? `+${storyReward.coins} Koin` : "Koin"}
