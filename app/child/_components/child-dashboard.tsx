@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { childrenApi, type ChildStoryHeader, type MarketItem } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { childrenApi, type ChildStoryHeader, type MarketItem, type StoryNode } from "@/lib/api";
 import { getChildAvatarSrc } from "@/lib/child-avatar";
 import { readChildCoins, saveChildCoins } from "@/lib/child-coins";
 import { readSavingTargetId, saveSavingTargetId } from "@/lib/saving-target";
@@ -18,7 +18,7 @@ const navItems = [
 
 const DEFAULT_CHILD_POINTS = 75;
 
-function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search" | "play" | "edit" | "coin" | "logout"; className?: string }) {
+function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search" | "play" | "edit" | "coin" | "logout" | "speaker" | "wallet" | "star"; className?: string }) {
   const common = `${className} shrink-0`;
 
   if (name === "user") {
@@ -71,6 +71,32 @@ function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search
       <svg viewBox="0 0 24 24" className={common} fill="none" aria-hidden>
         <path d="M9 20H6.5A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         <path d="M14 8l4 4-4 4M18 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (name === "speaker") {
+    return (
+      <svg viewBox="0 0 24 24" className={common} fill="none" aria-hidden>
+        <path d="M4 10v4h4l5 4V6l-5 4H4Z" fill="currentColor" />
+        <path d="M16 9.5a4 4 0 0 1 0 5M18.5 7a7.5 7.5 0 0 1 0 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (name === "wallet") {
+    return (
+      <svg viewBox="0 0 24 24" className={common} fill="none" aria-hidden>
+        <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v10.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-10Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+        <path d="M16 12h4v4h-4a2 2 0 0 1 0-4Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (name === "star") {
+    return (
+      <svg viewBox="0 0 24 24" className={common} fill="currentColor" aria-hidden>
+        <path d="m12 3 2.5 5.2 5.7.8-4.1 4 1 5.6L12 16l-5.1 2.7 1-5.6-4.1-4 5.7-.8L12 3Z" />
       </svg>
     );
   }
@@ -491,13 +517,24 @@ type LessonItem = {
   progress: number;
   status: "CONTINUE" | "NEW";
   action: string;
-  image: string;
+  imageSrc: string;
   topic?: string;
 };
 
-function storyHeaderToLesson(story: ChildStoryHeader, index: number): LessonItem {
-  const imageTypes = ["forest", "beach", "blank"];
+function getStoryImageSrcFromSeed(seed: string, imageUrl?: string) {
+  if (imageUrl?.trim()) return imageUrl;
 
+  const totalImages = 10;
+  let hash = 0;
+
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) % totalImages;
+  }
+
+  return `/images/${hash + 1}.png`;
+}
+
+function storyHeaderToLesson(story: ChildStoryHeader, index: number): LessonItem {
   return {
     id: story.id,
     title: story.title,
@@ -505,55 +542,91 @@ function storyHeaderToLesson(story: ChildStoryHeader, index: number): LessonItem
     progress: 0,
     status: "NEW",
     action: "Mulai Baca",
-    image: imageTypes[index % imageTypes.length],
+    imageSrc: getStoryImageSrcFromSeed(story.id || `${story.title}-${index}`, story.image_url),
     topic: story.topic,
   };
 }
 
-function LessonArt({ type }: { type: string }) {
-  if (type === "forest") {
-    return (
-      <div className="h-64 rounded-[1.35rem] bg-[linear-gradient(90deg,rgba(21,41,20,.55),transparent_40%),linear-gradient(180deg,rgba(248,230,143,.65),transparent_55%),repeating-linear-gradient(90deg,#22351f_0_12px,#5d7a39_12px_17px,#173016_17px_34px)]">
-        <div className="h-full rounded-[1.35rem] bg-[radial-gradient(circle_at_80%_12%,rgba(255,242,168,.45),transparent_18%),linear-gradient(180deg,transparent_55%,rgba(93,101,38,.55))]" />
+function EmptyLessonsState({
+  title,
+  message,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="mt-10 rounded-[1.2rem] border border-[#eadcc3] bg-white px-6 py-10 text-center shadow-[0_12px_24px_rgba(116,89,47,0.08)]">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#fff1c2] text-[#f79316]">
+        <Icon name="book" className="h-7 w-7" />
       </div>
-    );
-  }
-
-  if (type === "beach") {
-    return (
-      <div className="relative h-64 overflow-hidden rounded-[1.35rem] bg-[linear-gradient(180deg,#39bfff_0_48%,#1db9d4_48%_63%,#f9cf54_63%)]">
-        <div className="absolute right-6 top-0 h-36 w-28 rounded-b-full bg-[#148f3f] [clip-path:polygon(45%_0,72%_0,61%_100%,40%_100%)]" />
-        <div className="absolute right-6 top-5 h-28 w-44 rotate-[-14deg] rounded-full bg-[#25a741] [clip-path:ellipse(50%_26%_at_50%_50%)]" />
-        <div className="absolute bottom-12 right-20 h-10 w-20 rounded-md bg-[#7c461c] shadow-[inset_0_8px_0_rgba(255,201,77,.45)]" />
-        <div className="absolute bottom-9 right-24 h-5 w-16 rounded-b-lg bg-[#553114]" />
-      </div>
-    );
-  }
-
-  return <div className="h-64 rounded-[1.35rem] bg-white" />;
+      <h3 className="mt-5 text-2xl font-black text-[#2d2924]">{title}</h3>
+      <p className="mx-auto mt-3 max-w-md text-[0.98rem] font-semibold leading-7 text-[#6d5b4d]">{message}</p>
+      {actionLabel && onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-6 h-12 rounded-full bg-[#fa9818] px-7 text-[0.9rem] font-black text-white shadow-[0_10px_18px_rgba(232,113,31,0.22)]"
+        >
+          {actionLabel}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function LessonCard({ lesson }: { lesson: LessonItem }) {
+  const router = useRouter();
+
+  function openStory() {
+    window.sessionStorage.setItem(
+      `tomoStory:${lesson.id}`,
+      JSON.stringify({
+        title: lesson.title,
+        description: lesson.description,
+        topic: lesson.topic,
+        imageSrc: lesson.imageSrc,
+      })
+    );
+    router.push(`/child/stories/${lesson.id}`);
+  }
+
   return (
-    <article className="rounded-[1.7rem] bg-white p-3 pb-8 shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
+    <article className="group overflow-hidden rounded-[1.25rem] border border-[#eadcc3] bg-white shadow-[0_16px_30px_rgba(116,89,47,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_36px_rgba(116,89,47,0.14)]">
       <div className="relative">
-        <LessonArt type={lesson.image} />
-        <span className={`absolute left-5 top-4 rounded-full px-4 py-1 text-[0.7rem] font-black text-[#2b261e] shadow-[0_8px_16px_rgba(79,55,17,.15)] ${lesson.status === "CONTINUE" ? "bg-[#8e7100] text-white" : "bg-[#ff9818]"}`}>{lesson.status}</span>
-      </div>
-      <div className="px-6 pt-7">
-        <h3 className="text-[1.45rem] font-black leading-tight text-[#f79316]">{lesson.title}</h3>
+        <div className="h-56 overflow-hidden bg-[#e7dfcf]">
+          <img
+            src={lesson.imageSrc}
+            alt=""
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_44%,rgba(0,0,0,.62))]" />
+        </div>
+        <span className={`absolute left-4 top-4 rounded-full px-4 py-1 text-[0.68rem] font-black tracking-[0.12em] shadow-[0_8px_16px_rgba(79,55,17,.15)] ${lesson.status === "CONTINUE" ? "bg-[#8e7100] text-white" : "bg-[#ffc400] text-[#4d3906]"}`}>{lesson.status}</span>
         {lesson.topic ? (
-          <p className="mt-2 text-[0.78rem] font-black uppercase tracking-[0.16em] text-[#806006]">{lesson.topic}</p>
+          <span className="absolute bottom-4 left-4 max-w-[calc(100%-2rem)] rounded-full bg-white/90 px-4 py-1 text-[0.72rem] font-black uppercase tracking-[0.14em] text-[#7b5909] backdrop-blur">
+            {lesson.topic}
+          </span>
         ) : null}
-        <p className="mt-4 min-h-[4.5rem] text-[0.98rem] font-medium leading-7 text-[#5e4d44]">{lesson.description}</p>
-        <div className="mt-6 flex items-center justify-between text-[0.78rem] font-black text-[#806006]">
+      </div>
+      <div className="flex min-h-[18rem] flex-col px-6 py-6">
+        <h3 className="line-clamp-2 text-[1.35rem] font-black leading-tight text-[#2d2924]">{lesson.title}</h3>
+        <p className="mt-4 line-clamp-3 text-[0.95rem] font-medium leading-7 text-[#5e4d44]">{lesson.description}</p>
+        <div className="mt-auto flex items-center justify-between pt-6 text-[0.75rem] font-black text-[#806006]">
           <span>Adventure Progress</span>
           <span>{lesson.progress}%</span>
         </div>
         <div className="mt-2 h-4 overflow-hidden rounded-full bg-[#e3ddca]">
           <div className="h-full rounded-full bg-[#ff9417]" style={{ width: `${lesson.progress}%` }} />
         </div>
-        <button className="mt-8 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff6845] to-[#ff9f1c] text-[0.95rem] font-black text-white shadow-[0_12px_20px_rgba(232,113,31,0.22)]">
+        <button
+          type="button"
+          onClick={openStory}
+          className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff6845] to-[#ff9f1c] px-5 text-[0.9rem] font-black text-white shadow-[0_12px_20px_rgba(232,113,31,0.22)] transition hover:brightness-105"
+        >
           {lesson.action}
           <Icon name={lesson.progress ? "book" : "play"} className="h-4 w-4" />
         </button>
@@ -566,12 +639,31 @@ export function ChildLessonsPage() {
   const [lessons, setLessons] = useState<LessonItem[]>([]);
   const [isLoadingLessons, setIsLoadingLessons] = useState(true);
   const [lessonsError, setLessonsError] = useState("");
+  const [lessonSearch, setLessonSearch] = useState("");
+  const [lessonFilter, setLessonFilter] = useState<"ALL" | "UNSTARTED" | "COMPLETED">("ALL");
+
+  async function loadLessons() {
+    setIsLoadingLessons(true);
+    setLessonsError("");
+    const response = await childrenApi.getStoryHeaders();
+
+    if (response.success) {
+      setLessons((response.data ?? []).map(storyHeaderToLesson));
+    } else {
+      setLessonsError(response.error ?? "Lessons belum bisa dimuat.");
+      setLessons([]);
+    }
+
+    setIsLoadingLessons(false);
+  }
 
   useEffect(() => {
-    const loadLessons = async () => {
-      setIsLoadingLessons(true);
-      setLessonsError("");
+    let ignore = false;
+
+    async function loadInitialLessons() {
       const response = await childrenApi.getStoryHeaders();
+
+      if (ignore) return;
 
       if (response.success) {
         setLessons((response.data ?? []).map(storyHeaderToLesson));
@@ -581,40 +673,103 @@ export function ChildLessonsPage() {
       }
 
       setIsLoadingLessons(false);
-    };
+    }
 
-    loadLessons();
+    loadInitialLessons();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
+
+  const filteredLessons = useMemo(() => {
+    const query = lessonSearch.trim().toLowerCase();
+
+    return lessons.filter((lesson) => {
+      const matchesFilter =
+        lessonFilter === "ALL" ||
+        (lessonFilter === "UNSTARTED" && lesson.progress < 100) ||
+        (lessonFilter === "COMPLETED" && lesson.progress >= 100);
+      const matchesSearch =
+        !query ||
+        lesson.title.toLowerCase().includes(query) ||
+        lesson.description.toLowerCase().includes(query) ||
+        (lesson.topic ?? "").toLowerCase().includes(query);
+
+      return matchesFilter && matchesSearch;
+    });
+  }, [lessonFilter, lessonSearch, lessons]);
+
+  const completedCount = lessons.filter((lesson) => lesson.progress >= 100).length;
+  const activeCount = lessons.length - completedCount;
 
   return (
     <main className="min-h-screen bg-[#fbf5e8] pb-16">
       <ChildNavbar active="lessons" />
-      <section className="mx-auto max-w-[1240px] px-8 pt-8">
-        <div className="grid min-h-80 items-center gap-8 rounded-[2.6rem] bg-[#f6eedc] px-10 py-8 md:grid-cols-[1.15fr_0.85fr]">
-          <div>
-            <h1 className="max-w-[560px] text-5xl font-black leading-[1.45] tracking-[-0.03em] text-[#f79316]">Ready for your next adventure?</h1>
-            <p className="mt-4 max-w-[560px] text-xl font-medium leading-8 text-[#2f2a24]">Welcome back, Explorer! Choose a story below to continue your journey through the world of finance.</p>
+      <section className="mx-auto max-w-[1240px] px-5 pt-8 sm:px-8">
+        <div className="overflow-hidden rounded-[1.5rem] border border-[#eadcc3] bg-[#fffaf0] shadow-[0_16px_32px_rgba(116,89,47,0.08)]">
+          <div className="grid items-center gap-8 px-6 py-7 md:grid-cols-[1fr_auto] md:px-8 lg:px-10">
+            <div>
+              <span className="inline-flex rounded-full bg-[#fff0bd] px-4 py-1 text-[0.72rem] font-black uppercase tracking-[0.16em] text-[#806006]">
+                Story Library
+              </span>
+              <h1 className="mt-4 max-w-[620px] text-[clamp(2rem,4vw,3.4rem)] font-black leading-tight text-[#f79316]">
+                Pilih petualangan Tomo
+              </h1>
+              <p className="mt-4 max-w-[620px] text-[1rem] font-semibold leading-7 text-[#4f4339]">
+                Baca cerita, pilih keputusan, dengarkan audio, lalu lihat rangkuman di akhir cerita.
+              </p>
+            </div>
+            <MascotImage src="/images/tomo4.png" alt="Tomo dengan harta karun" className="mx-auto h-52 w-60 md:h-64 md:w-72" />
           </div>
-          <MascotImage src="/images/tomo4.png" alt="Tomo dengan harta karun" className="mx-auto h-72 w-80" />
+
+          <div className="grid border-t border-[#eadcc3] bg-white/55 sm:grid-cols-3">
+            {[
+              ["Cerita", lessons.length],
+              ["Aktif", activeCount],
+              ["Selesai", completedCount],
+            ].map(([label, value]) => (
+              <div key={label} className="border-[#eadcc3] px-6 py-4 text-center sm:border-r last:sm:border-r-0">
+                <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-[#806006]">{label}</p>
+                <p className="mt-1 text-3xl font-black text-[#2d2924]">{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-14 grid gap-5 md:grid-cols-[1fr_auto]">
-          <label className="flex h-14 items-center gap-4 rounded-full bg-[#e7dfcf] px-6 text-[#6c6258]">
+        <div className="mt-8 grid gap-4 rounded-[1.2rem] border border-[#eadcc3] bg-white p-4 shadow-[0_10px_22px_rgba(116,89,47,0.07)] lg:grid-cols-[1fr_auto]">
+          <label className="flex h-14 items-center gap-4 rounded-[0.9rem] bg-[#f6eedc] px-5 text-[#6c6258]">
             <Icon name="search" className="h-5 w-5 text-[#564a40]" />
-            <input className="h-full flex-1 bg-transparent text-[1rem] font-semibold outline-none placeholder:text-[#8c8791]" placeholder="Search adventures..." />
+            <input
+              value={lessonSearch}
+              onChange={(event) => setLessonSearch(event.target.value)}
+              className="h-full flex-1 bg-transparent text-[1rem] font-semibold outline-none placeholder:text-[#8c8791]"
+              placeholder="Cari judul, topik, atau isi cerita..."
+            />
           </label>
-          <div className="flex flex-wrap gap-3">
-            {["ALL", "UNSTARTED", "COMPLETED"].map((filter, index) => (
-              <button key={filter} className={`h-11 rounded-full px-7 text-[0.78rem] font-black tracking-[0.18em] ${index === 0 ? "bg-[#ffc000] text-[#593f00]" : "bg-[#e7dfcf] text-[#6d5449]"}`}>{filter}</button>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {(["ALL", "UNSTARTED", "COMPLETED"] as const).map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setLessonFilter(filter)}
+                className={`h-14 rounded-[0.9rem] px-5 text-[0.76rem] font-black tracking-[0.14em] transition ${
+                  lessonFilter === filter
+                    ? "bg-[#ffc400] text-[#4d3906] shadow-[0_10px_18px_rgba(255,196,0,0.2)]"
+                    : "bg-[#f6eedc] text-[#6d5449] hover:bg-[#efe4cf]"
+                }`}
+              >
+                {filter}
+              </button>
             ))}
           </div>
         </div>
 
         {isLoadingLessons ? (
-          <div className="mt-12 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
-              <article key={index} className="min-h-[28rem] animate-pulse rounded-[1.7rem] bg-white p-3 pb-8 shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
-                <div className="h-64 rounded-[1.35rem] bg-[#e7dfcf]" />
+              <article key={index} className="min-h-[28rem] animate-pulse rounded-[1.25rem] border border-[#eadcc3] bg-white pb-8 shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
+                <div className="h-56 bg-[#e7dfcf]" />
                 <div className="px-6 pt-7">
                   <div className="h-7 w-2/3 rounded-full bg-[#e7dfcf]" />
                   <div className="mt-5 h-20 rounded-[1rem] bg-[#f1e8d9]" />
@@ -623,18 +778,446 @@ export function ChildLessonsPage() {
             ))}
           </div>
         ) : lessonsError ? (
-          <div className="mt-12 rounded-[1.7rem] bg-white px-6 py-8 text-center text-[1rem] font-black text-[#806006] shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
-            {lessonsError}
-          </div>
+          <EmptyLessonsState
+            title="Lesson belum bisa dimuat"
+            message={lessonsError}
+            actionLabel="Coba Lagi"
+            onAction={loadLessons}
+          />
         ) : lessons.length === 0 ? (
-          <div className="mt-12 rounded-[1.7rem] bg-white px-6 py-8 text-center text-[1rem] font-black text-[#806006] shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
-            Belum ada lesson. Minta parent generate story dulu.
-          </div>
+          <EmptyLessonsState
+            title="Belum ada cerita"
+            message="Minta parent generate story dulu, nanti cerita akan muncul otomatis di library ini."
+          />
+        ) : filteredLessons.length === 0 ? (
+          <EmptyLessonsState
+            title="Cerita tidak ditemukan"
+            message="Coba pakai kata kunci lain atau pilih filter ALL untuk melihat semua cerita."
+            actionLabel="Reset Filter"
+            onAction={() => {
+              setLessonSearch("");
+              setLessonFilter("ALL");
+            }}
+          />
         ) : (
-          <div className="mt-12 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
-            {lessons.map((lesson) => (
+          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {filteredLessons.map((lesson) => (
               <LessonCard key={lesson.id} lesson={lesson} />
             ))}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+type StorySnapshot = {
+  title: string;
+  description: string;
+  topic?: string;
+  imageSrc?: string;
+};
+
+function readStorySnapshot(storyId: string): StorySnapshot {
+  const fallback = {
+    title: "Misteri Hutan Berbisik",
+    description: "",
+  };
+
+  if (typeof window === "undefined") return fallback;
+
+  const savedStory = window.sessionStorage.getItem(`tomoStory:${storyId}`);
+  if (!savedStory) return fallback;
+
+  try {
+    const parsed = JSON.parse(savedStory) as Partial<StorySnapshot>;
+    return {
+      title: parsed.title || fallback.title,
+      description: parsed.description || fallback.description,
+      topic: parsed.topic,
+      imageSrc: parsed.imageSrc,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function getRandomStoryImageSrc(nodeId?: string, imageUrl?: string) {
+  return getStoryImageSrcFromSeed(nodeId || "story", imageUrl);
+}
+
+function ForestPanel({
+  children,
+  image,
+  onSpeak,
+  isAudioLoading,
+}: {
+  children: React.ReactNode;
+  image?: string;
+  onSpeak: () => void;
+  isAudioLoading: boolean;
+}) {
+  return (
+    <div className="relative min-h-[26rem] overflow-hidden rounded-[1.5rem] bg-[#1e2c25] shadow-[0_18px_34px_rgba(86,59,25,0.16)]">
+      {image ? (
+        <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : null}
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,22,20,.82),rgba(18,22,20,.28)_54%,rgba(18,22,20,.62)),linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.68))]" />
+      <button
+        type="button"
+        onClick={onSpeak}
+        disabled={isAudioLoading}
+        className="absolute left-7 top-7 z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#fa9818] text-white shadow-[0_14px_28px_rgba(56,37,13,0.24)]"
+        aria-label="Putar suara cerita"
+      >
+        {isAudioLoading ? (
+          <span className="h-8 w-8 animate-spin rounded-full border-4 border-white/45 border-t-white" />
+        ) : (
+          <Icon name="speaker" className="h-10 w-10" />
+        )}
+      </button>
+      <div className="absolute bottom-8 left-8 right-8 z-10 max-w-[880px] text-[clamp(1.6rem,3vw,3.2rem)] font-black leading-tight text-white drop-shadow-[0_3px_10px_rgba(0,0,0,.5)]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function StoryProgress({
+  title,
+  steps,
+  totalSteps,
+  percentage,
+  isComplete,
+}: {
+  title: string;
+  steps: number;
+  totalSteps: number;
+  percentage?: number;
+  isComplete: boolean;
+}) {
+  const page = Math.max(1, steps + 1);
+  const displayTotal = Math.max(page, totalSteps);
+  const progressWidth = isComplete
+    ? 100
+    : Math.min(100, Math.max(0, percentage ?? (page / displayTotal) * 100));
+
+  return (
+    <div className="mx-auto max-w-[560px] text-center">
+      <h1 className="mx-auto w-max max-w-full rounded-full bg-[#f1ead4] px-8 py-2 text-[1rem] font-black text-[#fa9818]">
+        {title}
+      </h1>
+      <div className="mt-4 grid grid-cols-[1fr_auto] items-center gap-3">
+        <div className="h-4 overflow-hidden rounded-full bg-[#e8dfc7]">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#ff6845] to-[#ff9f1c]"
+            style={{ width: `${progressWidth}%` }}
+          />
+        </div>
+        <span className="text-[0.75rem] font-black text-[#2d2924]">
+          {isComplete ? "Selesai" : `Halaman ${page} dari ${displayTotal}`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function isSessionCompleteMessage(message?: string) {
+  const normalized = (message ?? "").toLowerCase();
+  return normalized.includes("session") && normalized.includes("complete");
+}
+
+export function ChildStoryPlayerPage() {
+  const params = useParams<{ storyId: string }>();
+  const router = useRouter();
+  const storyId = params.storyId;
+  const [snapshot] = useState<StorySnapshot>(() => readStorySnapshot(storyId));
+  const [sessionId, setSessionId] = useState("");
+  const [node, setNode] = useState<StoryNode | null>(null);
+  const [stepsTaken, setStepsTaken] = useState(0);
+  const [totalStorySteps, setTotalStorySteps] = useState(10);
+  const [progressPercentage, setProgressPercentage] = useState<number | undefined>();
+  const [statusMessage, setStatusMessage] = useState("Memulai cerita...");
+  const [isChoosing, setIsChoosing] = useState<"wise" | "impulsive" | null>(null);
+  const [summaryText, setSummaryText] = useState("");
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const decisionInFlightRef = useRef(false);
+  const activeNodeIdRef = useRef("");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    activeNodeIdRef.current = node?.node_id ?? "";
+  }, [node?.node_id]);
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function startStory() {
+      setStatusMessage("Memulai cerita...");
+      const response = await childrenApi.startStory(storyId);
+
+      if (ignore) return;
+
+      if (response.success && response.data) {
+        const progress = response.data.progress;
+
+        setSessionId(response.data.session_id);
+        setNode(response.data.node);
+        setStepsTaken(progress?.steps_taken ?? 0);
+        setTotalStorySteps(progress?.total_steps ?? 10);
+        setProgressPercentage(progress?.percentage);
+        setSummaryText(response.data.summary?.summary ?? "");
+        setStatusMessage("");
+      } else {
+        setStatusMessage(response.error ?? "Story belum bisa dimulai.");
+      }
+    }
+
+    startStory();
+
+    return () => {
+      ignore = true;
+    };
+  }, [storyId]);
+
+  function playAudioUrl(audioUrl: string) {
+    audioRef.current?.pause();
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+
+    audio.play().catch(() => {
+      setStatusMessage("Audio belum bisa diputar otomatis. Tekan tombol suara sekali lagi.");
+    });
+  }
+
+  function playTextFallback(text: string) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setStatusMessage("Audio belum tersedia dari server.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const indonesianVoice = voices.find((voice) => voice.lang.toLowerCase().startsWith("id"));
+
+    utterance.lang = indonesianVoice?.lang ?? "id-ID";
+    utterance.voice = indonesianVoice ?? null;
+    utterance.rate = 0.92;
+    utterance.pitch = 1.05;
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  async function playNodeAudio() {
+    if (!node?.node_id || isAudioLoading) return;
+
+    if (node.audio_url) {
+      playAudioUrl(node.audio_url);
+      return;
+    }
+
+    const nodeId = node.node_id;
+    const fallbackText = node.audio_text;
+
+    setIsAudioLoading(true);
+    setStatusMessage("Membuat audio cerita...");
+    const response = await childrenApi.generateStoryNodeAudio(nodeId);
+    setIsAudioLoading(false);
+
+    if (activeNodeIdRef.current !== nodeId) return;
+
+    if (response.success && response.data?.audio_url) {
+      const audioUrl = response.data.audio_url;
+      setNode((current) => (current?.node_id === nodeId ? { ...current, audio_url: audioUrl } : current));
+      setStatusMessage("");
+      playAudioUrl(audioUrl);
+      return;
+    }
+
+    setStatusMessage(`${response.error ?? "Audio server belum tersedia."} Memakai suara perangkat.`);
+    playTextFallback(fallbackText);
+  }
+
+  async function finishCompletedSession(message?: string) {
+    if (!sessionId || !node) return;
+
+    setIsSummaryLoading(true);
+    const summaryResponse = await childrenApi.getStorySummary(sessionId);
+    setIsSummaryLoading(false);
+
+    setNode((current) =>
+      current
+        ? {
+            ...current,
+            is_end: true,
+            choices: undefined,
+          }
+        : current
+    );
+
+    if (summaryResponse.success && summaryResponse.data) {
+      setSummaryText(summaryResponse.data.summary);
+      setStatusMessage("");
+    } else {
+      setStatusMessage(message ?? "Sesi cerita sudah selesai.");
+    }
+  }
+
+  async function pickChoice(choice: "wise" | "impulsive") {
+    if (!sessionId || !node || decisionInFlightRef.current) return;
+
+    decisionInFlightRef.current = true;
+    setIsChoosing(choice);
+    setStatusMessage("");
+
+    try {
+      const response = await childrenApi.makeStoryDecision(sessionId, node.node_id, choice);
+
+      if (response.success && response.data) {
+        const nextStory = response.data;
+        const nextChoices = Object.values(nextStory.node.choices ?? {}).filter(Boolean);
+        const progress = nextStory.progress;
+
+        setSessionId(nextStory.session_id);
+        setNode(nextStory.node);
+        setStepsTaken((current) => progress?.steps_taken ?? current + 1);
+        setTotalStorySteps((current) => progress?.total_steps ?? current);
+        setProgressPercentage(progress?.percentage);
+        setSummaryText(nextStory.summary?.summary ?? "");
+
+        if (nextStory.node.is_end && nextChoices.length === 0 && !nextStory.summary?.summary) {
+          setIsSummaryLoading(true);
+          const summaryResponse = await childrenApi.getStorySummary(nextStory.session_id);
+          setIsSummaryLoading(false);
+
+          if (summaryResponse.success && summaryResponse.data) {
+            setSummaryText(summaryResponse.data.summary);
+          } else {
+            setStatusMessage(summaryResponse.error ?? "Summary belum bisa dibuat.");
+          }
+        }
+      } else if (isSessionCompleteMessage(response.error)) {
+        await finishCompletedSession(response.error);
+      } else {
+        setStatusMessage(response.error ?? "Pilihan belum bisa disimpan.");
+      }
+    } finally {
+      decisionInFlightRef.current = false;
+      setIsChoosing(null);
+    }
+  }
+
+  const title = snapshot.title || "Misteri Hutan Berbisik";
+  const choiceEntries = node?.choices
+    ? (Object.entries(node.choices).filter((entry): entry is ["wise" | "impulsive", string] =>
+        (entry[0] === "wise" || entry[0] === "impulsive") && Boolean(entry[1])
+      ))
+    : [];
+  const isEnd = Boolean(node?.is_end) && choiceEntries.length === 0;
+  const nodeImage = node
+    ? getRandomStoryImageSrc(node.node_id, node.image_url || snapshot.imageSrc)
+    : snapshot.imageSrc || "";
+  const finalText = summaryText || node?.audio_text || "";
+
+  return (
+    <main className="min-h-screen bg-[#fbf5e8] pb-16">
+      <ChildNavbar active="lessons" />
+      <section className="mx-auto max-w-[1160px] px-5 pt-8 sm:px-8">
+        <StoryProgress
+          title={title}
+          steps={stepsTaken}
+          totalSteps={totalStorySteps}
+          percentage={progressPercentage}
+          isComplete={isEnd}
+        />
+        {statusMessage ? (
+          <p className="mx-auto mt-3 max-w-xl rounded-full bg-white/80 px-4 py-2 text-center text-[0.82rem] font-black text-[#806006]">
+            {statusMessage}
+          </p>
+        ) : null}
+
+        {!node ? (
+          <div className="mt-8 min-h-[18rem] animate-pulse rounded-[1.5rem] bg-[#eee3ca]" />
+        ) : isEnd ? (
+          <div className="mx-auto max-w-[920px] pt-12">
+            <div className="relative min-h-[30rem] overflow-hidden rounded-[1.5rem] bg-[#1e2c25] px-9 py-10 shadow-[0_18px_34px_rgba(86,59,25,0.16)]">
+              {nodeImage ? (
+                <img src={nodeImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              ) : null}
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,22,20,.86),rgba(18,22,20,.32)_58%,rgba(18,22,20,.62)),linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.72))]" />
+              <button
+                type="button"
+                onClick={playNodeAudio}
+                disabled={isAudioLoading}
+                className="absolute left-7 top-7 z-10 flex h-20 w-20 items-center justify-center rounded-full bg-[#fa9818] text-white shadow-[0_14px_28px_rgba(56,37,13,0.2)]"
+                aria-label="Putar suara akhir cerita"
+              >
+                {isAudioLoading ? <span className="h-8 w-8 animate-spin rounded-full border-4 border-white/45 border-t-white" /> : <Icon name="speaker" className="h-10 w-10" />}
+              </button>
+              <div className="relative z-10 flex min-h-[24rem] items-end">
+                <div className="max-w-[760px]">
+                  <span className="rounded-full bg-[#ffc400] px-4 py-1 text-[0.72rem] font-black uppercase tracking-[0.16em] text-[#4d3906]">Cerita selesai</span>
+                  <h1 className="mt-4 text-[clamp(1.7rem,3.4vw,3.6rem)] font-black leading-tight text-white drop-shadow-[0_3px_10px_rgba(0,0,0,.5)]">
+                    {isSummaryLoading ? "Menyusun rangkuman cerita..." : finalText}
+                  </h1>
+                  <div className="mt-8 grid max-w-sm grid-cols-2 gap-0">
+                    <div className="rounded-l-[1rem] bg-white px-6 py-5 text-center shadow-[0_12px_20px_rgba(103,78,38,0.1)]">
+                      <Icon name="star" className="mx-auto h-8 w-8 text-[#fa9818]" />
+                      <p className="mt-2 text-[1rem] font-black text-[#5b4635]">XP</p>
+                    </div>
+                    <div className="rounded-r-[1rem] bg-white px-6 py-5 text-center shadow-[0_12px_20px_rgba(103,78,38,0.1)]">
+                      <Icon name="coin" className="mx-auto h-8 w-8 text-[#ffc400]" />
+                      <p className="mt-2 text-[1rem] font-black text-[#5b4635]">Badge</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/child/lessons")}
+              className="mx-auto mt-9 block h-16 w-full max-w-[420px] rounded-full bg-gradient-to-r from-[#ff6845] to-[#ff9f1c] text-[0.95rem] font-black text-white shadow-[0_14px_24px_rgba(232,113,31,0.24)]"
+            >
+              Lanjutkan Petualangan
+            </button>
+          </div>
+        ) : (
+          <div className="mt-7">
+            <ForestPanel image={nodeImage} onSpeak={playNodeAudio} isAudioLoading={isAudioLoading}>
+              {node.audio_text}
+            </ForestPanel>
+            {choiceEntries.length > 0 ? (
+              <div className="mx-auto -mt-1 max-w-[1060px] rounded-[1.4rem] bg-white px-6 py-7 text-center shadow-[0_14px_28px_rgba(103,78,38,0.12)]">
+                <p className="text-2xl font-black leading-tight text-[#2d2924]">Apa yang harus Tomo lakukan?</p>
+                <div className="mx-auto mt-7 grid max-w-[760px] gap-5 sm:grid-cols-2">
+                  {choiceEntries.map(([choice, label]) => (
+                    <button
+                      key={choice}
+                      type="button"
+                      onClick={() => pickChoice(choice)}
+                      disabled={Boolean(isChoosing)}
+                      className={`min-h-36 rounded-[1.2rem] border-t-8 bg-[#f2ecd9] px-6 py-5 shadow-[0_14px_24px_rgba(103,78,38,0.12)] transition hover:-translate-y-0.5 disabled:opacity-60 ${
+                        choice === "wise" ? "border-[#fa9818] text-[#806006]" : "border-[#ff6845] text-[#ff6845]"
+                      }`}
+                    >
+                      <Icon name={choice === "wise" ? "wallet" : "coin"} className="mx-auto h-12 w-12" />
+                      <span className="mt-4 block text-xl font-black">{isChoosing === choice ? "Memilih..." : label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </section>

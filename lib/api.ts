@@ -94,7 +94,43 @@ export interface ChildStoryHeader {
   title: string;
   fullStory: string;
   topic?: string;
+  image_url?: string;
   created_at?: string;
+}
+
+export interface StartedStory {
+  session_id: string;
+  node: StoryNode;
+  progress?: StoryProgress;
+  summary?: StorySummary;
+}
+
+export interface StoryNode {
+  node_id: string;
+  audio_text: string;
+  image_url?: string;
+  audio_url?: string;
+  is_end: boolean;
+  choices?: {
+    wise?: string;
+    impulsive?: string;
+  };
+}
+
+export interface StoryProgress {
+  steps_taken?: number;
+  total_steps?: number;
+  percentage?: number;
+}
+
+export interface StoryAudio {
+  node_id: string;
+  audio_url: string;
+}
+
+export interface StorySummary {
+  session_id?: string;
+  summary: string;
 }
 
 export interface MarketItem {
@@ -229,6 +265,36 @@ function getStringField(source: Record<string, unknown>, keys: string[]): string
   return "";
 }
 
+function getBooleanField(source: Record<string, unknown>, keys: string[]): boolean {
+  for (const key of keys) {
+    const value = source[key];
+
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value === 1;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "yes", "end", "done", "completed"].includes(normalized)) return true;
+      if (["false", "0", "no", "continue", "ongoing"].includes(normalized)) return false;
+    }
+  }
+
+  return false;
+}
+
+function getNumberField(source: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = source[key];
+
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+
+  return undefined;
+}
+
 function normalizeStoryHeader(data: unknown): GeneratedStoryHeader | null {
   if (!isRecord(data)) return null;
 
@@ -361,8 +427,129 @@ function normalizeChildStoryHeader(item: unknown): ChildStoryHeader | null {
     title: title || "Untitled Story",
     fullStory,
     topic: getStringField(source, ["topic"]) || getStringField(nestedStory, ["topic"]),
+    image_url:
+      getStringField(source, ["image_url", "imageUrl"]) ||
+      getStringField(nestedStory, ["image_url", "imageUrl"]),
     created_at: getStringField(source, ["created_at", "createdAt"]),
   };
+}
+
+function normalizeStoryNode(data: unknown): StoryNode | null {
+  if (!isRecord(data)) return null;
+  const choices = isRecord(data.choices) ? data.choices : {};
+  const nodeId = getStringField(data, ["node_id", "nodeId", "id", "_id"]);
+  const audioText = getStringField(data, ["audio_text", "audioText", "text", "content", "story"]);
+
+  if (!nodeId && !audioText) return null;
+
+  return {
+    node_id: nodeId,
+    audio_text: audioText,
+    image_url: getStringField(data, ["image_url", "imageUrl"]),
+    audio_url: getStringField(data, ["audio_url", "audioUrl", "audio"]),
+    is_end: getBooleanField(data, ["is_end", "isEnd", "end", "completed"]),
+    choices: {
+      wise:
+        getStringField(choices, ["wise", "Wise"]) ||
+        getStringField(data, ["wise", "wise_choice", "wiseChoice"]),
+      impulsive:
+        getStringField(choices, ["impulsive", "Impulsive"]) ||
+        getStringField(data, ["impulsive", "impulsive_choice", "impulsiveChoice"]),
+    },
+  };
+}
+
+function findStoryNodeSource(source: Record<string, unknown>): unknown {
+  return (
+    source.node ||
+    source.next_node ||
+    source.nextNode ||
+    source.story_node ||
+    source.storyNode ||
+    source.current_node ||
+    source.currentNode ||
+    source
+  );
+}
+
+function normalizeStartedStory(data: unknown, fallbackSessionId = ""): StartedStory | null {
+  if (!isRecord(data)) return null;
+  const source = isRecord(data.data) ? data.data : data;
+  const node = normalizeStoryNode(findStoryNodeSource(source));
+  const sessionId = getStringField(source, ["session_id", "sessionId", "session"]) || fallbackSessionId;
+
+  if (!sessionId || !node) return null;
+
+  return {
+    session_id: sessionId,
+    node,
+    progress: normalizeStoryProgress(source),
+    summary: normalizeStorySummary(source),
+  };
+}
+
+function normalizeStoryProgress(data: unknown): StoryProgress | undefined {
+  if (!isRecord(data)) return undefined;
+
+  const source = isRecord(data.progress) ? data.progress : data;
+  const stepsTaken = getNumberField(source, ["steps_taken", "stepsTaken", "step", "current_step", "currentStep"]);
+  const totalSteps = getNumberField(source, ["total_steps", "totalSteps", "total", "max_steps", "maxSteps"]);
+  const percentage = getNumberField(source, ["percentage", "percent", "progress_percent", "progressPercent"]);
+
+  if (stepsTaken === undefined && totalSteps === undefined && percentage === undefined) {
+    return undefined;
+  }
+
+  return {
+    steps_taken: stepsTaken,
+    total_steps: totalSteps,
+    percentage,
+  };
+}
+
+function normalizeStorySummary(data: unknown): StorySummary | undefined {
+  if (!isRecord(data)) return undefined;
+  const source = isRecord(data.data) ? data.data : data;
+  const summary =
+    getStringField(source, ["summary", "summary_text", "summaryText", "text", "message", "content"]) ||
+    (isRecord(source.summary)
+      ? getStringField(source.summary, ["summary", "summary_text", "summaryText", "text", "content"])
+      : "") ||
+    (isRecord(source.result)
+      ? getStringField(source.result, ["summary", "summary_text", "summaryText", "text", "content"])
+      : "");
+
+  if (!summary) return undefined;
+
+  return {
+    session_id: getStringField(source, ["session_id", "sessionId", "id"]),
+    summary,
+  };
+}
+
+function findAudioSource(data: unknown): Record<string, unknown> | null {
+  if (!isRecord(data)) return null;
+
+  const candidates = [
+    data.data,
+    data.audio,
+    data.result,
+    isRecord(data.data) ? data.data.audio : undefined,
+    isRecord(data.data) ? data.data.result : undefined,
+    data,
+  ];
+
+  return candidates.find(isRecord) ?? null;
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function isTemporaryGatewayError(status?: number) {
+  return status === 502 || status === 503 || status === 504;
 }
 
 /**
@@ -718,6 +905,159 @@ export const childrenApi = {
       data: extractArray(res.data)
         .map(normalizeChildStoryHeader)
         .filter((story): story is ChildStoryHeader => Boolean(story)),
+    };
+  },
+
+  startStory: async (storyId: string): Promise<ApiResponse<StartedStory>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const endpoint = API_CONFIG.ENDPOINTS.CHILDREN.START_STORY.replace(":storyId", storyId);
+    const res = await apiCall(
+      endpoint,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const story = normalizeStartedStory(res.data);
+    if (!story) return { success: false, error: "Data story tidak valid." };
+
+    return { success: true, data: story };
+  },
+
+  makeStoryDecision: async (
+    sessionId: string,
+    nodeId: string,
+    choice: "wise" | "impulsive"
+  ): Promise<ApiResponse<StartedStory>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const endpoint = API_CONFIG.ENDPOINTS.SESSIONS.DECISION.replace(":sessionId", sessionId);
+    const res = await apiCall(endpoint, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...childAuthHeaders(),
+      },
+      body: JSON.stringify({ node_id: nodeId, choice }),
+    });
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const story = normalizeStartedStory(res.data, sessionId);
+    if (!story) return { success: false, error: "Data keputusan story tidak valid." };
+
+    return { success: true, data: story };
+  },
+
+  generateStoryNodeAudio: async (nodeId: string): Promise<ApiResponse<StoryAudio>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const endpoint = API_CONFIG.ENDPOINTS.CHILDREN.STORY_NODE_AUDIO.replace(":nodeId", nodeId);
+    const requestAudio = () =>
+      apiCall(endpoint, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+      });
+
+    let res = await requestAudio();
+
+    if (!res.success && isTemporaryGatewayError(res.status)) {
+      await wait(1200);
+      res = await requestAudio();
+    }
+
+    if (!res.success) {
+      return {
+        success: false,
+        error: isTemporaryGatewayError(res.status)
+          ? "Server audio sedang sibuk. Coba lagi sebentar lagi."
+          : res.error,
+        status: res.status,
+      };
+    }
+
+    const source = findAudioSource(res.data);
+    if (!isRecord(source)) return { success: false, error: "Data audio tidak valid." };
+
+    const audioUrl = getStringField(source, ["audio_url", "audioUrl", "url", "public_url", "publicUrl", "audio"]);
+    if (!audioUrl) return { success: false, error: "URL audio tidak tersedia." };
+
+    return {
+      success: true,
+      data: {
+        node_id: getStringField(source, ["node_id", "nodeId"]) || nodeId,
+        audio_url: audioUrl,
+      },
+    };
+  },
+
+  getStorySummary: async (sessionId: string): Promise<ApiResponse<StorySummary>> => {
+    if (!hasChildToken()) {
+      return {
+        success: false,
+        error: "Token anak belum ada. Login sebagai anak dulu.",
+      };
+    }
+
+    const generateEndpoint = API_CONFIG.ENDPOINTS.SESSIONS.SUMMARY_GENERATE.replace(
+      ":sessionId",
+      sessionId
+    );
+    const readEndpoint = API_CONFIG.ENDPOINTS.SESSIONS.SUMMARY.replace(":sessionId", sessionId);
+    const requestSummary = (endpoint: string, method: "GET" | "POST") =>
+      apiCall(endpoint, {
+        method,
+        credentials: "include",
+        headers: {
+          ...childAuthHeaders(),
+        },
+      });
+    let res = await requestSummary(generateEndpoint, "POST");
+
+    if (!res.success && (res.status === 404 || res.status === 405)) {
+      res = await requestSummary(readEndpoint, "POST");
+    }
+
+    if (!res.success && (res.status === 404 || res.status === 405)) {
+      res = await requestSummary(readEndpoint, "GET");
+    }
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const summary = normalizeStorySummary(res.data);
+    if (!summary) return { success: false, error: "Data summary tidak valid." };
+
+    return {
+      success: true,
+      data: {
+        session_id: summary.session_id || sessionId,
+        summary: summary.summary,
+      },
     };
   },
 
