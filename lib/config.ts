@@ -19,6 +19,11 @@ export const API_CONFIG = {
     },
     PARENT: {
       INFO: "/api/parent/info",
+      STORY_HEADERS: "/api/parent/story-headers",
+      GENERATE_STORY_HEADERS: "/api/parent/story-headers/generate",
+    },
+    THEMES: {
+      GET_ALL: "/api/themes",
     },
     CHILDREN: {
       REGISTER: "/api/children/register",
@@ -26,6 +31,7 @@ export const API_CONFIG = {
       UPDATE_NAME: "/api/children/name",
       GET_LIST: "/api/children",
       STORY_HEADERS: "/api/children/story-headers",
+      DELETE: "/api/children/:id",
       MARKETS: "/api/children/markets",
       COINS: "/api/children/coins",
       SAVING_GOAL: "/api/children/saving-goal",

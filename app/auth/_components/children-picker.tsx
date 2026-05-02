@@ -179,7 +179,7 @@ function ProfileCard({
 }
 
 export function ChildrenPickerModal({
-  childProfiles = [],
+  childProfiles: childrenList = [],
   onChildSelect,
   onAddChild,
   defaultMode = "picker",
@@ -350,7 +350,7 @@ export function ChildrenPickerModal({
         {/* Header */}
         <div className="mb-20 text-center">
           <h1 className="text-5xl font-black tracking-[-0.06em] text-[#f49416] sm:text-6xl lg:text-7xl">
-            Who&apos;s watching?
+            Who&apos;s exploring?
           </h1>
           <p className="mt-6 text-lg font-medium text-[#5f4d42] sm:text-xl">
             Select a profile to continue with Tomo
@@ -370,7 +370,7 @@ export function ChildrenPickerModal({
             </div>
 
             {/* Children Avatars */}
-            {childProfiles.map((childName) => (
+            {childrenList.map((childName: ChildProfile) => (
               <div key={childName.id} className="flex justify-center">
                 <ProfileCard
                   name={childName.name}

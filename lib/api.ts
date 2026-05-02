@@ -17,12 +17,34 @@ export interface ChildProfile {
   created_at?: string;
 }
 
-export interface MarketItem {
-  id: string;
+export interface ThemeTopic {
+  topic: string;
+}
+
+export interface StoryTheme {
   title: string;
-  image_url: string;
-  price: number;
-  created_at?: string;
+  fullStory: string;
+}
+
+export interface GeneratedStoryHeader extends StoryTheme {
+  id?: string;
+  topic?: string;
+  customPrompt?: string;
+  createdAt?: string;
+}
+
+export interface StoryThemes {
+  finance: ThemeTopic[];
+  story: StoryTheme[];
+}
+
+export interface GenerateStoryHeaderPayload {
+  topic: string;
+  story: {
+    title: string;
+    full_story: string;
+  };
+  customPrompt: string;
 }
 
 export interface SavingGoal {
@@ -38,6 +60,12 @@ export interface ChildStoryHeader {
   title: string;
   fullStory: string;
   topic?: string;
+  
+export interface MarketItem {
+  id: string;
+  title: string;
+  image_url: string;
+  price: number;
   created_at?: string;
 }
 
@@ -47,16 +75,20 @@ const AUTH_TOKEN_FALLBACK_KEYS = ["accessToken", "token"];
 let pendingCoinsRequest: Promise<ApiResponse<number>> | null = null;
 let coinsEndpointUnavailable = false;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
 function extractToken(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const d = data as Record<string, unknown>;
+  if (!isRecord(data)) return null;
+  const d = data;
   if (typeof d.accessToken === "string") return d.accessToken;
   if (typeof d.token === "string") return d.token;
   if (typeof d.jwt === "string") return d.jwt;
-  if (d.Token && typeof d.Token === "object") {
+  if (isRecord(d.Token)) {
     return extractToken(d.Token);
   }
-  if (d.data && typeof d.data === "object") {
+  if (isRecord(d.data)) {
     return extractToken(d.data);
   }
   return null;
@@ -82,6 +114,9 @@ function storeParentProfileFromResponse(data: unknown) {
     (d.parent && typeof d.parent === "object" ? d.parent : null) ||
     d;
   const source = src as Record<string, unknown>;
+  if (typeof window === "undefined" || !isRecord(data)) return;
+
+  const source = isRecord(data.user) ? data.user : isRecord(data.data) ? data.data : data;
 
   const name =
     (source.username || source.name || source.fullName || source.full_name) || "";
@@ -132,16 +167,93 @@ function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+function getChildStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(CHILD_AUTH_TOKEN_KEY);
+}
+
 function childAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const t =
-    window.localStorage.getItem(CHILD_AUTH_TOKEN_KEY) ||
-    window.localStorage.getItem("childAccessToken");
+  const t = getChildStoredToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
 function hasChildToken(): boolean {
-  return Boolean(childAuthHeaders().Authorization);
+  return Boolean(getChildStoredToken());
+}
+
+function getStringField(source: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function normalizeStoryHeader(data: unknown): GeneratedStoryHeader | null {
+  if (!isRecord(data)) return null;
+
+  const source = isRecord(data.data) ? data.data : data;
+  const storySource = isRecord(source.story) ? source.story : source;
+
+  const title =
+    getStringField(storySource, ["title", "storyTitle", "header", "name"]) ||
+    getStringField(source, ["title", "storyTitle", "header", "name"]);
+  const fullStory =
+    getStringField(storySource, [
+      "fullStory",
+      "full_story",
+      "story",
+      "content",
+      "body",
+      "description",
+    ]) ||
+    getStringField(source, [
+      "fullStory",
+      "full_story",
+      "story",
+      "content",
+      "body",
+      "description",
+    ]);
+
+  if (!title && !fullStory) return null;
+
+  return {
+    id: getStringField(source, ["id", "_id", "storyHeaderId"]),
+    title: title || "Generated Story",
+    fullStory,
+    topic: getStringField(source, ["topic"]) || getStringField(storySource, ["topic"]),
+    customPrompt:
+      getStringField(source, ["customPrompt", "custom_prompt"]) ||
+      getStringField(storySource, ["customPrompt", "custom_prompt"]),
+    createdAt: getStringField(source, ["createdAt", "created_at"]),
+  };
+}
+
+function extractArray(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (!isRecord(data)) return [];
+
+  const candidates = [
+    data.data,
+    data.storyHeaders,
+    data.story_headers,
+    data.stories,
+    data.results,
+    data.items,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  if (isRecord(data.data)) {
+    return extractArray(data.data);
+  }
+
+  return [];
 }
 
 function getFriendlyApiError(status: number, data: unknown): string {
@@ -265,7 +377,7 @@ async function apiCall<T>(
     if (!response.ok) {
       return {
         success: false,
-        error: getFriendlyApiError(response.status, data),
+        error: data.error || data.message || `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 
@@ -353,13 +465,86 @@ export const parentApi = {
       },
     });
   },
+
+  getStoryHeaders: async (): Promise<ApiResponse<GeneratedStoryHeader[]>> => {
+    const res = await apiCall(API_CONFIG.ENDPOINTS.PARENT.STORY_HEADERS, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+    });
+
+    if (!res.success) return { success: false, error: res.error };
+
+    return {
+      success: true,
+      data: extractArray(res.data)
+        .map(normalizeStoryHeader)
+        .filter((story): story is GeneratedStoryHeader => Boolean(story)),
+    };
+  },
+
+  generateStoryHeaders: async (
+    payload: GenerateStoryHeaderPayload
+  ): Promise<ApiResponse<GeneratedStoryHeader>> => {
+    const res = await apiCall(API_CONFIG.ENDPOINTS.PARENT.GENERATE_STORY_HEADERS, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.success) return { success: false, error: res.error };
+
+    return {
+      success: true,
+      data: normalizeStoryHeader(res.data) ?? {
+        title: payload.story.title,
+        fullStory: payload.story.full_story,
+        topic: payload.topic,
+        customPrompt: payload.customPrompt,
+        createdAt: new Date().toISOString(),
+      },
+    };
+  },
+};
+
+/**
+ * Story theme API calls
+ */
+export const themeApi = {
+  getAll: async (): Promise<ApiResponse<StoryThemes>> => {
+    const res = await apiCall<{ message?: string; data?: StoryThemes }>(
+      API_CONFIG.ENDPOINTS.THEMES.GET_ALL,
+      {
+        method: "GET",
+      }
+    );
+
+    if (!res.success) return { success: false, error: res.error };
+
+    const body = res.data;
+    if (body?.data && Array.isArray(body.data.finance) && Array.isArray(body.data.story)) {
+      return { success: true, data: body.data };
+    }
+
+    return {
+      success: false,
+      error: "Invalid themes response.",
+    };
+  },
 };
 
 /**
  * Children API calls
  */
 export const childrenApi = {
-  register: async (username: string, pin: string) => {
+  register: async (username: string, pin: string, parentId?: string) => {
+    const payload = parentId ? { name: username, pin, parentId } : { name: username, pin };
+
     return apiCall(API_CONFIG.ENDPOINTS.CHILDREN.REGISTER, {
       method: "POST",
       credentials: "include",
@@ -367,7 +552,7 @@ export const childrenApi = {
         ...authHeaders(),
       },
       // backend expects `name` field
-      body: JSON.stringify({ name: username, pin }),
+      body: JSON.stringify(payload),
     });
   },
 
@@ -429,9 +614,9 @@ export const childrenApi = {
 
     if (!res.success) return { success: false, error: res.error };
 
-    const body = res.data as { data?: unknown };
+    const body = res.data;
     if (body && Array.isArray(body.data)) {
-      return { success: true, data: body.data as ChildProfile[] };
+      return { success: true, data: body.data };
     }
 
     // Fallback: if API already returned a raw array of child objects
@@ -466,6 +651,15 @@ export const childrenApi = {
         .map(normalizeChildStoryHeader)
         .filter((story): story is ChildStoryHeader => Boolean(story)),
     };
+  delete: async (childId: string) => {
+    const endpoint = API_CONFIG.ENDPOINTS.CHILDREN.DELETE.replace(":id", childId);
+    return apiCall(endpoint, {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+    });
   },
 
   getMarkets: async (): Promise<ApiResponse<MarketItem[]>> => {
@@ -561,14 +755,16 @@ export const childrenApi = {
       };
     }
 
+    // Some backends expect the marketId in the POST body instead of the path.
     const res = await apiCall<{ message?: string; data?: SavingGoal }>(
-      `${API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL}/${encodeURIComponent(marketId)}`,
+      API_CONFIG.ENDPOINTS.CHILDREN.SAVING_GOAL,
       {
         method: "POST",
         credentials: "include",
         headers: {
           ...childAuthHeaders(),
         },
+        body: JSON.stringify({ marketId }),
       }
     );
 
@@ -581,4 +777,5 @@ export const childrenApi = {
 
     return { success: false, error: "Saving goal tidak valid." };
   },
+
 };
