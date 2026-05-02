@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { childrenApi, type MarketItem } from "@/lib/api";
+import { childrenApi, type ChildStoryHeader, type MarketItem } from "@/lib/api";
 import { getChildAvatarSrc } from "@/lib/child-avatar";
 import { readChildCoins } from "@/lib/child-coins";
 import { readSavingTargetId } from "@/lib/saving-target";
@@ -266,32 +266,31 @@ export function ChildHomePage() {
   );
 }
 
-const lessons = [
-  {
-    title: "Misteri Hutan Berbisik",
-    description: "Learn the value of saving as you navigate through a forest where trees whisper financial secrets.",
-    progress: 85,
-    status: "CONTINUE",
-    action: "Lanjut Baca",
-    image: "forest",
-  },
-  {
-    title: "Harta Karun Pulau Emas",
-    description: "Master the art of budgeting and smart spending on a tropical island filled with hidden coins.",
+type LessonItem = {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  status: "CONTINUE" | "NEW";
+  action: string;
+  image: string;
+  topic?: string;
+};
+
+function storyHeaderToLesson(story: ChildStoryHeader, index: number): LessonItem {
+  const imageTypes = ["forest", "beach", "blank"];
+
+  return {
+    id: story.id,
+    title: story.title,
+    description: story.fullStory,
     progress: 0,
     status: "NEW",
     action: "Mulai Baca",
-    image: "beach",
-  },
-  {
-    title: "Gunung Es Investasi",
-    description: "Discover how small actions today can grow into something huge over time through long-term growth.",
-    progress: 0,
-    status: "NEW",
-    action: "Mulai Baca",
-    image: "blank",
-  },
-];
+    image: imageTypes[index % imageTypes.length],
+    topic: story.topic,
+  };
+}
 
 function LessonArt({ type }: { type: string }) {
   if (type === "forest") {
@@ -316,7 +315,7 @@ function LessonArt({ type }: { type: string }) {
   return <div className="h-64 rounded-[1.35rem] bg-white" />;
 }
 
-function LessonCard({ lesson }: { lesson: (typeof lessons)[number] }) {
+function LessonCard({ lesson }: { lesson: LessonItem }) {
   return (
     <article className="rounded-[1.7rem] bg-white p-3 pb-8 shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
       <div className="relative">
@@ -325,6 +324,9 @@ function LessonCard({ lesson }: { lesson: (typeof lessons)[number] }) {
       </div>
       <div className="px-6 pt-7">
         <h3 className="text-[1.45rem] font-black leading-tight text-[#f79316]">{lesson.title}</h3>
+        {lesson.topic ? (
+          <p className="mt-2 text-[0.78rem] font-black uppercase tracking-[0.16em] text-[#806006]">{lesson.topic}</p>
+        ) : null}
         <p className="mt-4 min-h-[4.5rem] text-[0.98rem] font-medium leading-7 text-[#5e4d44]">{lesson.description}</p>
         <div className="mt-6 flex items-center justify-between text-[0.78rem] font-black text-[#806006]">
           <span>Adventure Progress</span>
@@ -343,6 +345,29 @@ function LessonCard({ lesson }: { lesson: (typeof lessons)[number] }) {
 }
 
 export function ChildLessonsPage() {
+  const [lessons, setLessons] = useState<LessonItem[]>([]);
+  const [isLoadingLessons, setIsLoadingLessons] = useState(true);
+  const [lessonsError, setLessonsError] = useState("");
+
+  useEffect(() => {
+    const loadLessons = async () => {
+      setIsLoadingLessons(true);
+      setLessonsError("");
+      const response = await childrenApi.getStoryHeaders();
+
+      if (response.success) {
+        setLessons((response.data ?? []).map(storyHeaderToLesson));
+      } else {
+        setLessonsError(response.error ?? "Lessons belum bisa dimuat.");
+        setLessons([]);
+      }
+
+      setIsLoadingLessons(false);
+    };
+
+    loadLessons();
+  }, []);
+
   return (
     <main className="min-h-screen bg-[#fbf5e8] pb-16">
       <ChildNavbar active="lessons" />
@@ -367,11 +392,33 @@ export function ChildLessonsPage() {
           </div>
         </div>
 
-        <div className="mt-12 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
-          {[...lessons, ...lessons].map((lesson, index) => (
-            <LessonCard key={`${lesson.title}-${index}`} lesson={lesson} />
-          ))}
-        </div>
+        {isLoadingLessons ? (
+          <div className="mt-12 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <article key={index} className="min-h-[28rem] animate-pulse rounded-[1.7rem] bg-white p-3 pb-8 shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
+                <div className="h-64 rounded-[1.35rem] bg-[#e7dfcf]" />
+                <div className="px-6 pt-7">
+                  <div className="h-7 w-2/3 rounded-full bg-[#e7dfcf]" />
+                  <div className="mt-5 h-20 rounded-[1rem] bg-[#f1e8d9]" />
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : lessonsError ? (
+          <div className="mt-12 rounded-[1.7rem] bg-white px-6 py-8 text-center text-[1rem] font-black text-[#806006] shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
+            {lessonsError}
+          </div>
+        ) : lessons.length === 0 ? (
+          <div className="mt-12 rounded-[1.7rem] bg-white px-6 py-8 text-center text-[1rem] font-black text-[#806006] shadow-[0_16px_30px_rgba(116,89,47,0.08)]">
+            Belum ada lesson. Minta parent generate story dulu.
+          </div>
+        ) : (
+          <div className="mt-12 grid gap-10 md:grid-cols-2 xl:grid-cols-3">
+            {lessons.map((lesson) => (
+              <LessonCard key={lesson.id} lesson={lesson} />
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
