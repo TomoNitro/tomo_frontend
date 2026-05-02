@@ -26,20 +26,6 @@ function formatTrendLabel(date: string) {
   });
 }
 
-function getDashboardReport(childName: string, dashboard: ParentChildDashboard | null) {
-  if (!dashboard) {
-    return "Pilih profil anak untuk melihat ringkasan keputusan, tabungan, cerita, dan aktivitas terbaru.";
-  }
-
-  const wisePercentage = clampPercentage(dashboard.decision_summary?.wise_percentage);
-  const goal = dashboard.saving_goal;
-  const goalText = goal?.goal_name
-    ? ` Target tabungan ${goal.goal_name} sudah ${clampPercentage(goal.progress_percentage)}%.`
-    : "";
-
-  return `${childName} mencatat ${wisePercentage}% keputusan bijak dari aktivitas terakhir.${goalText} Pantau progres ini untuk menentukan cerita dan tantangan berikutnya.`;
-}
-
 export default function ParentDashboard() {
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [selectedChildId, setSelectedChildId] = useState("");
@@ -47,6 +33,8 @@ export default function ParentDashboard() {
   const [dashboardSummary, setDashboardSummary] = useState<ParentChildDashboardSummary | null>(null);
   const [isLoadingChildren, setIsLoadingChildren] = useState(true);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isSummaryMissing, setIsSummaryMissing] = useState(false);
   const [childrenError, setChildrenError] = useState("");
   const [dashboardError, setDashboardError] = useState("");
   const [summaryError, setSummaryError] = useState("");
@@ -100,7 +88,7 @@ export default function ParentDashboard() {
       maxValue,
     };
   }, [trend]);
-  const report = dashboardSummary?.summary || getDashboardReport(selectedChild?.name ?? "Anak", dashboard);
+  const report = dashboardSummary?.summary ?? "";
 
   const loadDashboard = useCallback(async (childId: string) => {
     setDashboardError("");
@@ -118,11 +106,18 @@ export default function ParentDashboard() {
   const loadDashboardSummary = useCallback(async (childId: string) => {
     setIsLoadingSummary(true);
     setSummaryError("");
+    setIsSummaryMissing(false);
 
     const response = await parentApi.getChildDashboardSummary(childId);
 
     if (response.success && response.data) {
       setDashboardSummary(response.data);
+    } else if (
+      response.status === 404 ||
+      (response.error ?? "").toLowerCase().includes("not found")
+    ) {
+      setDashboardSummary(null);
+      setIsSummaryMissing(true);
     } else {
       setDashboardSummary(null);
       setSummaryError(response.error ?? "Report description belum bisa dimuat.");
@@ -130,6 +125,23 @@ export default function ParentDashboard() {
 
     setIsLoadingSummary(false);
   }, []);
+
+  const generateDashboardSummary = useCallback(async () => {
+    if (!selectedChildId || isGeneratingSummary) return;
+
+    setIsGeneratingSummary(true);
+    setSummaryError("");
+    const response = await parentApi.generateChildDashboardSummary(selectedChildId);
+
+    if (response.success && response.data) {
+      setDashboardSummary(response.data);
+      setIsSummaryMissing(false);
+    } else {
+      setSummaryError(response.error ?? "AI summary belum bisa dibuat.");
+    }
+
+    setIsGeneratingSummary(false);
+  }, [isGeneratingSummary, selectedChildId]);
 
   const loadChildDashboard = useCallback(
     (childId: string) => {
@@ -243,7 +255,7 @@ export default function ParentDashboard() {
           <p className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{dashboardError}</p>
         ) : null}
 
-        {summaryError ? (
+        {summaryError && !isSummaryMissing ? (
           <p className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{summaryError}</p>
         ) : null}
 
@@ -258,9 +270,26 @@ export default function ParentDashboard() {
                   </span>
                 ) : null}
               </div>
-              <p className="text-[0.95rem] leading-relaxed text-[#5f4d42]">
-                {isLoadingSummary ? "Loading report description..." : report}
-              </p>
+              {!isSummaryMissing ? (
+                <p className="text-[0.95rem] leading-relaxed text-[#5f4d42]">
+                  {isLoadingSummary ? "Loading report description..." : report}
+                </p>
+              ) : null}
+              {isSummaryMissing ? (
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <p className="text-sm font-bold text-[#8d7661]">
+                    AI summary belum tersedia untuk anak ini.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={generateDashboardSummary}
+                    disabled={isGeneratingSummary || isLoadingSummary}
+                    className="inline-flex h-11 w-fit items-center justify-center rounded-full bg-gradient-to-r from-[#f59f1b] to-[#ff8128] px-5 text-sm font-black text-white shadow-[0_10px_18px_rgba(232,113,31,0.22)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isGeneratingSummary ? "Generating..." : "Generate AI Summary"}
+                  </button>
+                </div>
+              ) : null}
               {dashboardSummary?.suggestion ? (
                 <p className="mt-4 rounded-2xl bg-[#fff8e9] px-4 py-3 text-sm font-bold leading-6 text-[#7d6b57]">
                   {dashboardSummary.suggestion}

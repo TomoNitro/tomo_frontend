@@ -23,6 +23,7 @@ export const API_CONFIG = {
       GENERATE_STORY_HEADERS: "/api/parent/story-headers/generate",
       CHILD_DASHBOARD: "/api/parent/children/:childId/dashboard",
       CHILD_DASHBOARD_SUMMARY: "/api/parent/children/:childId/dashboard/summary",
+      GENERATE_CHILD_DASHBOARD_SUMMARY: "/api/parent/children/:childId/dashboard/summary/generate",
     },
     THEMES: {
       GET_ALL: "/api/themes",
