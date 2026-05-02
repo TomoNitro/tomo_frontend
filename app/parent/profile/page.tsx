@@ -114,8 +114,11 @@ export default function EditProfile() {
 
       const parentResponse = await parentApi.getInfo();
       if (parentResponse.success && parentResponse.data && typeof parentResponse.data === "object") {
-        const parentData = parentResponse.data as Record<string, any>;
-        const source = parentData.data && typeof parentData.data === "object" ? parentData.data : parentData;
+        const parentData = parentResponse.data as Record<string, unknown>;
+        const source =
+          parentData.data && typeof parentData.data === "object"
+            ? (parentData.data as Record<string, unknown>)
+            : parentData;
         const apiName = source.username ?? source.name ?? source.fullName;
         const apiEmail = source.email;
 
