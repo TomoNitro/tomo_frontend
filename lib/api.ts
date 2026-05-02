@@ -131,6 +131,20 @@ function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+function getChildStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(CHILD_AUTH_TOKEN_KEY);
+}
+
+function childAuthHeaders(): Record<string, string> {
+  const t = getChildStoredToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+function hasChildToken(): boolean {
+  return Boolean(getChildStoredToken());
+}
+
 function getStringField(source: Record<string, unknown>, keys: string[]): string {
   for (const key of keys) {
     const value = source[key];
