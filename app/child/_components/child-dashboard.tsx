@@ -1573,17 +1573,6 @@ export function ChildStoryPlayerPage() {
   );
 }
 
-function Badge({ label, color }: { label: string; color: string }) {
-  return (
-    <div className="text-center">
-      <div className={`mx-auto flex h-24 w-24 items-center justify-center rounded-full border-4 border-[#bd9c58] ${color} shadow-[inset_0_4px_12px_rgba(255,255,255,.45)]`}>
-        <Icon name={label === "Savvy Saver" ? "coin" : label === "The Trade-off" ? "edit" : "book"} className="h-12 w-12 text-[#7a4d13]" />
-      </div>
-      <p className="mx-auto -mt-2 w-max rounded-sm bg-[#f7ecd8] px-3 py-1 text-[0.82rem] font-black text-[#5b3f24] shadow"> {label}</p>
-    </div>
-  );
-}
-
 export function ChildProfilePage() {
   const [profileName, setProfileName] = useState("Scout Alex");
   const [profileAvatarSrc, setProfileAvatarSrc] = useState(getChildAvatarSrc(""));
@@ -1595,6 +1584,8 @@ export function ChildProfilePage() {
   const [isSavingProfileName, setIsSavingProfileName] = useState(false);
   const [profileNameMessage, setProfileNameMessage] = useState("");
   const [savingTargetMessage, setSavingTargetMessage] = useState("");
+  const [progress, setProgress] = useState<ChildProgress | null>(null);
+  const [progressMessage, setProgressMessage] = useState("");
   const [subtitleEnabled, setSubtitleEnabled] = useState(true);
 
   useEffect(() => {
@@ -1616,10 +1607,12 @@ export function ChildProfilePage() {
     const loadSavings = async () => {
       setIsLoadingSavings(true);
       setSavingTargetMessage("");
+      setProgressMessage("");
 
-      const [marketsResponse, savedTargetId] = await Promise.all([
+      const [marketsResponse, savedTargetId, progressResponse] = await Promise.all([
         childrenApi.getMarkets(),
         Promise.resolve(readSavingTargetId()),
+        childrenApi.getProgress(),
       ]);
 
       if (marketsResponse.success && Array.isArray(marketsResponse.data)) {
@@ -1633,6 +1626,12 @@ export function ChildProfilePage() {
       } else {
         setSavingTarget(null);
         setSavingTargetMessage(marketsResponse.error ?? "Daftar target belum bisa dimuat.");
+      }
+
+      if (progressResponse.success && progressResponse.data) {
+        setProgress(progressResponse.data);
+      } else if (progressResponse.error) {
+        setProgressMessage(progressResponse.error);
       }
 
       setIsLoadingSavings(false);
@@ -1684,6 +1683,20 @@ export function ChildProfilePage() {
     ? Math.min(100, Math.round((profileCoins / savingTarget.price) * 100))
     : 0;
   const remainingCoins = savingTarget ? Math.max(0, savingTarget.price - profileCoins) : 0;
+  const progressData: ChildProgress = progress ?? {
+    total_exp: 0,
+    level: 1,
+    next_level_exp: 50,
+    exp_to_next_level: 50,
+    badges: [],
+  };
+  const totalExp = progressData.total_exp;
+  const level = Math.max(1, progressData.level);
+  const nextLevelExp = progressData.next_level_exp || Math.max(50, level * 50);
+  const progressPercent = nextLevelExp > 0
+    ? Math.min(100, Math.round((totalExp / nextLevelExp) * 100))
+    : 0;
+  const badges = progressData.badges;
 
   return (
     <main className="min-h-screen bg-[#fbf5e8] pb-12">
@@ -1703,7 +1716,7 @@ export function ChildProfilePage() {
               />
             </div>
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-[#ff6845] px-5 py-2 text-sm font-black text-white shadow-[0_10px_18px_rgba(255,104,69,0.24)]">
-              LVL 12
+              LVL {level}
             </span>
           </div>
           <div className="relative mt-9 min-w-0 flex-1 text-center md:mt-0 md:text-left">
@@ -1723,13 +1736,19 @@ export function ChildProfilePage() {
             </p>
             <div className="mx-auto mt-6 max-w-xl rounded-[1.2rem] bg-[#fff4d8] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] md:mx-0">
               <div className="flex items-center justify-between gap-4 text-[0.9rem] font-black text-[#6d510b]">
-                <span>Level 12</span>
-                <span>750 / 1000 XP</span>
+                <span>Level {level}</span>
+                <span>{totalExp} / {nextLevelExp} XP</span>
               </div>
               <div className="mt-3 h-4 overflow-hidden rounded-full bg-white shadow-[inset_0_2px_4px_rgba(125,92,37,0.12)]">
-                <div className="h-full w-[75%] rounded-full bg-gradient-to-r from-[#ffc000] to-[#ff9818]" />
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#ffc000] to-[#ff9818]"
+                  style={{ width: `${progressPercent}%` }}
+                />
               </div>
             </div>
+            {progressMessage ? (
+              <p className="mt-3 text-[0.82rem] font-black text-[#b9802e]">{progressMessage}</p>
+            ) : null}
           </div>
         </div>
 
@@ -1794,11 +1813,15 @@ export function ChildProfilePage() {
 
         <section className="rounded-[1.8rem] border-2 border-[#ffd253] bg-[#fff0b8] px-6 py-7 text-center shadow-[0_14px_24px_rgba(116,89,47,0.07)] md:px-8">
           <h2 className="text-3xl font-black text-[#806006] sm:text-4xl">Badge Collection</h2>
-          <div className="mt-8 flex flex-wrap justify-center gap-10">
-            <Badge label="Spending Spree" color="bg-[#91d47b]" />
-            <Badge label="The Trade-off" color="bg-[#87c9e9]" />
-            <Badge label="Savvy Saver" color="bg-[#f7a3a8]" />
-          </div>
+          {badges.length > 0 ? (
+            <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {badges.map((badge) => (
+                <BadgeTile key={badge.id || badge.name} badge={badge} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-6 text-[0.95rem] font-black text-[#7b5d08]">Belum ada badge. Terus kumpulkan XP!</p>
+          )}
         </section>
 
         <aside className="space-y-6">
