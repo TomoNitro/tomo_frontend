@@ -60,7 +60,9 @@ export interface ChildStoryHeader {
   title: string;
   fullStory: string;
   topic?: string;
-  
+  created_at?: string;
+}
+
 export interface MarketItem {
   id: string;
   title: string;
@@ -114,9 +116,6 @@ function storeParentProfileFromResponse(data: unknown) {
     (d.parent && typeof d.parent === "object" ? d.parent : null) ||
     d;
   const source = src as Record<string, unknown>;
-  if (typeof window === "undefined" || !isRecord(data)) return;
-
-  const source = isRecord(data.user) ? data.user : isRecord(data.data) ? data.data : data;
 
   const name =
     (source.username || source.name || source.fullName || source.full_name) || "";
@@ -291,41 +290,6 @@ function getFriendlyNetworkError(error: unknown): string {
   } catch {
     return "Network error";
   }
-}
-
-function getStringField(source: Record<string, unknown>, keys: string[]): string {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-  return "";
-}
-
-function extractArray(data: unknown): unknown[] {
-  if (Array.isArray(data)) return data;
-  if (!data || typeof data !== "object") return [];
-
-  const record = data as Record<string, unknown>;
-  const candidates = [
-    record.data,
-    record.storyHeaders,
-    record.story_headers,
-    record.stories,
-    record.items,
-    record.results,
-  ];
-
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate;
-  }
-
-  if (record.data && typeof record.data === "object") {
-    return extractArray(record.data);
-  }
-
-  return [];
 }
 
 function normalizeChildStoryHeader(item: unknown): ChildStoryHeader | null {
@@ -651,6 +615,8 @@ export const childrenApi = {
         .map(normalizeChildStoryHeader)
         .filter((story): story is ChildStoryHeader => Boolean(story)),
     };
+  },
+
   delete: async (childId: string) => {
     const endpoint = API_CONFIG.ENDPOINTS.CHILDREN.DELETE.replace(":id", childId);
     return apiCall(endpoint, {
