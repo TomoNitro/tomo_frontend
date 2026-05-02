@@ -19,6 +19,8 @@ export const API_CONFIG = {
     },
     PARENT: {
       INFO: "/api/parent/info",
+      STORY_HEADERS: "/api/parent/story-headers",
+      GENERATE_STORY_HEADERS: "/api/parent/story-headers/generate",
     },
     THEMES: {
       GET_ALL: "/api/themes",

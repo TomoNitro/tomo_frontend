@@ -21,9 +21,30 @@ export interface ThemeTopic {
   topic: string;
 }
 
+export interface StoryTheme {
+  title: string;
+  fullStory: string;
+}
+
+export interface GeneratedStoryHeader extends StoryTheme {
+  id?: string;
+  topic?: string;
+  customPrompt?: string;
+  createdAt?: string;
+}
+
 export interface StoryThemes {
   finance: ThemeTopic[];
-  story: ThemeTopic[];
+  story: StoryTheme[];
+}
+
+export interface GenerateStoryHeaderPayload {
+  topic: string;
+  story: {
+    title: string;
+    full_story: string;
+  };
+  customPrompt: string;
 }
 
 const AUTH_TOKEN_KEY = "tomoAuthToken";
@@ -90,6 +111,81 @@ function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+function getStringField(source: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function normalizeStoryHeader(data: unknown): GeneratedStoryHeader | null {
+  if (!isRecord(data)) return null;
+
+  const source = isRecord(data.data) ? data.data : data;
+  const storySource = isRecord(source.story) ? source.story : source;
+
+  const title =
+    getStringField(storySource, ["title", "storyTitle", "header", "name"]) ||
+    getStringField(source, ["title", "storyTitle", "header", "name"]);
+  const fullStory =
+    getStringField(storySource, [
+      "fullStory",
+      "full_story",
+      "story",
+      "content",
+      "body",
+      "description",
+    ]) ||
+    getStringField(source, [
+      "fullStory",
+      "full_story",
+      "story",
+      "content",
+      "body",
+      "description",
+    ]);
+
+  if (!title && !fullStory) return null;
+
+  return {
+    id: getStringField(source, ["id", "_id", "storyHeaderId"]),
+    title: title || "Generated Story",
+    fullStory,
+    topic: getStringField(source, ["topic"]) || getStringField(storySource, ["topic"]),
+    customPrompt:
+      getStringField(source, ["customPrompt", "custom_prompt"]) ||
+      getStringField(storySource, ["customPrompt", "custom_prompt"]),
+    createdAt: getStringField(source, ["createdAt", "created_at"]),
+  };
+}
+
+function extractArray(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (!isRecord(data)) return [];
+
+  const candidates = [
+    data.data,
+    data.storyHeaders,
+    data.story_headers,
+    data.stories,
+    data.results,
+    data.items,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  if (isRecord(data.data)) {
+    return extractArray(data.data);
+  }
+
+  return [];
+}
+
 /**
  * Generic fetch wrapper for API calls
  */
@@ -113,7 +209,7 @@ async function apiCall<T>(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || `HTTP ${response.status}: ${response.statusText}`,
+        error: data.error || data.message || `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 
@@ -200,6 +296,51 @@ export const parentApi = {
         ...authHeaders(),
       },
     });
+  },
+
+  getStoryHeaders: async (): Promise<ApiResponse<GeneratedStoryHeader[]>> => {
+    const res = await apiCall(API_CONFIG.ENDPOINTS.PARENT.STORY_HEADERS, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+    });
+
+    if (!res.success) return { success: false, error: res.error };
+
+    return {
+      success: true,
+      data: extractArray(res.data)
+        .map(normalizeStoryHeader)
+        .filter((story): story is GeneratedStoryHeader => Boolean(story)),
+    };
+  },
+
+  generateStoryHeaders: async (
+    payload: GenerateStoryHeaderPayload
+  ): Promise<ApiResponse<GeneratedStoryHeader>> => {
+    const res = await apiCall(API_CONFIG.ENDPOINTS.PARENT.GENERATE_STORY_HEADERS, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...authHeaders(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.success) return { success: false, error: res.error };
+
+    return {
+      success: true,
+      data: normalizeStoryHeader(res.data) ?? {
+        title: payload.story.title,
+        fullStory: payload.story.full_story,
+        topic: payload.topic,
+        customPrompt: payload.customPrompt,
+        createdAt: new Date().toISOString(),
+      },
+    };
   },
 };
 
