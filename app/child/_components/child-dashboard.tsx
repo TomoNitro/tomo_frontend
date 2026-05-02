@@ -26,6 +26,7 @@ const navItems = [
 
 const DEFAULT_CHILD_POINTS = 75;
 const CHILD_PROGRESS_SNAPSHOT_KEY = "tomoChildProgressSnapshot";
+const CHILD_COMPLETED_STORIES_KEY_PREFIX = "tomoChildCompletedStories";
 
 type ProgressSnapshot = {
   level: number;
@@ -68,6 +69,46 @@ function saveProgressSnapshot(snapshot: ProgressSnapshot) {
   } catch {
     // ignore storage errors
   }
+}
+
+function getCompletedStoriesKey() {
+  if (typeof window === "undefined") return CHILD_COMPLETED_STORIES_KEY_PREFIX;
+  const childId = window.localStorage.getItem("selectedChildId");
+  return childId ? `${CHILD_COMPLETED_STORIES_KEY_PREFIX}:${childId}` : CHILD_COMPLETED_STORIES_KEY_PREFIX;
+}
+
+function readCompletedStoryIds() {
+  if (typeof window === "undefined") return new Set<string>();
+
+  try {
+    const raw = window.localStorage.getItem(getCompletedStoriesKey());
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+        : []
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function saveCompletedStoryIds(storyIds: Set<string>) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(getCompletedStoriesKey(), JSON.stringify(Array.from(storyIds)));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function markStoryCompleted(storyId: string) {
+  const completedStories = readCompletedStoryIds();
+  const wasCompleted = completedStories.has(storyId);
+  completedStories.add(storyId);
+  saveCompletedStoryIds(completedStories);
+  return { wasCompleted };
 }
 
 function Icon({ name, className = "h-5 w-5" }: { name: "user" | "book" | "search" | "play" | "edit" | "coin" | "logout" | "speaker" | "wallet" | "star"; className?: string }) {
@@ -382,6 +423,41 @@ export function ChildHomePage() {
   const [celebrationQueue, setCelebrationQueue] = useState<Celebration[]>([]);
   const [activeCelebration, setActiveCelebration] = useState<Celebration | null>(null);
 
+  function queueCelebrations(nextProgress: ChildProgress) {
+    if (typeof window === "undefined") return;
+
+    const snapshot = readProgressSnapshot();
+    const earnedBadges = nextProgress.badges.filter((badge) => badge.earned !== false);
+    const earnedIds = earnedBadges
+      .map((badge) => badge.id || badge.name)
+      .filter((value): value is string => Boolean(value));
+
+    if (!snapshot) {
+      saveProgressSnapshot({ level: nextProgress.level, badgeIds: earnedIds });
+      return;
+    }
+
+    const newEvents: Celebration[] = [];
+
+    if (nextProgress.level > snapshot.level) {
+      newEvents.push({ type: "level", level: nextProgress.level });
+    }
+
+    const previousBadgeIds = new Set(snapshot.badgeIds);
+    for (const badge of earnedBadges) {
+      const key = badge.id || badge.name;
+      if (key && !previousBadgeIds.has(key)) {
+        newEvents.push({ type: "badge", badge });
+      }
+    }
+
+    if (newEvents.length > 0) {
+      setCelebrationQueue((prev) => [...prev, ...newEvents]);
+    }
+
+    saveProgressSnapshot({ level: nextProgress.level, badgeIds: earnedIds });
+  }
+
   useEffect(() => {
     queueMicrotask(() => {
       const storedCoins = readChildCoins(DEFAULT_CHILD_POINTS);
@@ -438,45 +514,14 @@ export function ChildHomePage() {
 
   useEffect(() => {
     if (!activeCelebration && celebrationQueue.length > 0) {
-      setActiveCelebration(celebrationQueue[0]);
-      setCelebrationQueue((prev) => prev.slice(1));
+      const timeout = window.setTimeout(() => {
+        setActiveCelebration(celebrationQueue[0]);
+        setCelebrationQueue((prev) => prev.slice(1));
+      }, 0);
+
+      return () => window.clearTimeout(timeout);
     }
   }, [activeCelebration, celebrationQueue]);
-
-  function queueCelebrations(nextProgress: ChildProgress) {
-    if (typeof window === "undefined") return;
-
-    const snapshot = readProgressSnapshot();
-    const earnedBadges = nextProgress.badges.filter((badge) => badge.earned !== false);
-    const earnedIds = earnedBadges
-      .map((badge) => badge.id || badge.name)
-      .filter((value): value is string => Boolean(value));
-
-    if (!snapshot) {
-      saveProgressSnapshot({ level: nextProgress.level, badgeIds: earnedIds });
-      return;
-    }
-
-    const newEvents: Celebration[] = [];
-
-    if (nextProgress.level > snapshot.level) {
-      newEvents.push({ type: "level", level: nextProgress.level });
-    }
-
-    const previousBadgeIds = new Set(snapshot.badgeIds);
-    for (const badge of earnedBadges) {
-      const key = badge.id || badge.name;
-      if (key && !previousBadgeIds.has(key)) {
-        newEvents.push({ type: "badge", badge });
-      }
-    }
-
-    if (newEvents.length > 0) {
-      setCelebrationQueue((prev) => [...prev, ...newEvents]);
-    }
-
-    saveProgressSnapshot({ level: nextProgress.level, badgeIds: earnedIds });
-  }
 
   async function confirmSavingTarget() {
     const market = pendingSavingTarget;
@@ -776,8 +821,6 @@ type LessonItem = {
   id: string;
   title: string;
   description: string;
-  progress: number;
-  status: "CONTINUE" | "NEW";
   action: string;
   imageSrc: string;
   topic?: string;
@@ -801,8 +844,6 @@ function storyHeaderToLesson(story: ChildStoryHeader, index: number): LessonItem
     id: story.id,
     title: story.title,
     description: story.fullStory,
-    progress: 0,
-    status: "NEW",
     action: "Mulai Baca",
     imageSrc: getStoryImageSrcFromSeed(story.id || `${story.title}-${index}`, story.image_url),
     topic: story.topic,
@@ -867,7 +908,6 @@ function LessonCard({ lesson }: { lesson: LessonItem }) {
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_44%,rgba(0,0,0,.62))]" />
         </div>
-        <span className={`absolute left-4 top-4 rounded-full px-4 py-1 text-[0.68rem] font-black tracking-[0.12em] shadow-[0_8px_16px_rgba(79,55,17,.15)] ${lesson.status === "CONTINUE" ? "bg-[#8e7100] text-white" : "bg-[#ffc400] text-[#4d3906]"}`}>{lesson.status}</span>
         {lesson.topic ? (
           <span className="absolute bottom-4 left-4 max-w-[calc(100%-2rem)] rounded-full bg-white/90 px-4 py-1 text-[0.72rem] font-black uppercase tracking-[0.14em] text-[#7b5909] backdrop-blur">
             {lesson.topic}
@@ -877,20 +917,13 @@ function LessonCard({ lesson }: { lesson: LessonItem }) {
       <div className="flex min-h-[18rem] flex-col px-6 py-6">
         <h3 className="line-clamp-2 text-[1.35rem] font-black leading-tight text-[#2d2924]">{lesson.title}</h3>
         <p className="mt-4 line-clamp-3 text-[0.95rem] font-medium leading-7 text-[#5e4d44]">{lesson.description}</p>
-        <div className="mt-auto flex items-center justify-between pt-6 text-[0.75rem] font-black text-[#806006]">
-          <span>Adventure Progress</span>
-          <span>{lesson.progress}%</span>
-        </div>
-        <div className="mt-2 h-4 overflow-hidden rounded-full bg-[#e3ddca]">
-          <div className="h-full rounded-full bg-[#ff9417]" style={{ width: `${lesson.progress}%` }} />
-        </div>
         <button
           type="button"
           onClick={openStory}
-          className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff6845] to-[#ff9f1c] px-5 text-[0.9rem] font-black text-white shadow-[0_12px_20px_rgba(232,113,31,0.22)] transition hover:brightness-105"
+          className="mt-auto flex h-14 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff6845] to-[#ff9f1c] px-5 text-[0.9rem] font-black text-white shadow-[0_12px_20px_rgba(232,113,31,0.22)] transition hover:brightness-105"
         >
           {lesson.action}
-          <Icon name={lesson.progress ? "book" : "play"} className="h-4 w-4" />
+          <Icon name="play" className="h-4 w-4" />
         </button>
       </div>
     </article>
@@ -902,7 +935,6 @@ export function ChildLessonsPage() {
   const [isLoadingLessons, setIsLoadingLessons] = useState(true);
   const [lessonsError, setLessonsError] = useState("");
   const [lessonSearch, setLessonSearch] = useState("");
-  const [lessonFilter, setLessonFilter] = useState<"ALL" | "UNSTARTED" | "COMPLETED">("ALL");
 
   async function loadLessons() {
     setIsLoadingLessons(true);
@@ -948,22 +980,15 @@ export function ChildLessonsPage() {
     const query = lessonSearch.trim().toLowerCase();
 
     return lessons.filter((lesson) => {
-      const matchesFilter =
-        lessonFilter === "ALL" ||
-        (lessonFilter === "UNSTARTED" && lesson.progress < 100) ||
-        (lessonFilter === "COMPLETED" && lesson.progress >= 100);
       const matchesSearch =
         !query ||
         lesson.title.toLowerCase().includes(query) ||
         lesson.description.toLowerCase().includes(query) ||
         (lesson.topic ?? "").toLowerCase().includes(query);
 
-      return matchesFilter && matchesSearch;
+      return matchesSearch;
     });
-  }, [lessonFilter, lessonSearch, lessons]);
-
-  const completedCount = lessons.filter((lesson) => lesson.progress >= 100).length;
-  const activeCount = lessons.length - completedCount;
+  }, [lessonSearch, lessons]);
 
   return (
     <main className="min-h-screen bg-[#fbf5e8] pb-16">
@@ -985,11 +1010,9 @@ export function ChildLessonsPage() {
             <MascotImage src="/images/tomo4.png" alt="Tomo dengan harta karun" className="mx-auto h-52 w-60 md:h-64 md:w-72" />
           </div>
 
-          <div className="grid border-t border-[#eadcc3] bg-white/55 sm:grid-cols-3">
+          <div className="grid border-t border-[#eadcc3] bg-white/55">
             {[
               ["Cerita", lessons.length],
-              ["Aktif", activeCount],
-              ["Selesai", completedCount],
             ].map(([label, value]) => (
               <div key={label} className="border-[#eadcc3] px-6 py-4 text-center sm:border-r last:sm:border-r-0">
                 <p className="text-[0.72rem] font-black uppercase tracking-[0.16em] text-[#806006]">{label}</p>
@@ -999,7 +1022,7 @@ export function ChildLessonsPage() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-4 rounded-[1.2rem] border border-[#eadcc3] bg-white p-4 shadow-[0_10px_22px_rgba(116,89,47,0.07)] lg:grid-cols-[1fr_auto]">
+        <div className="mt-8 rounded-[1.2rem] border border-[#eadcc3] bg-white p-4 shadow-[0_10px_22px_rgba(116,89,47,0.07)]">
           <label className="flex h-14 items-center gap-4 rounded-[0.9rem] bg-[#f6eedc] px-5 text-[#6c6258]">
             <Icon name="search" className="h-5 w-5 text-[#564a40]" />
             <input
@@ -1009,22 +1032,6 @@ export function ChildLessonsPage() {
               placeholder="Cari judul, topik, atau isi cerita..."
             />
           </label>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {(["ALL", "UNSTARTED", "COMPLETED"] as const).map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setLessonFilter(filter)}
-                className={`h-14 rounded-[0.9rem] px-5 text-[0.76rem] font-black tracking-[0.14em] transition ${
-                  lessonFilter === filter
-                    ? "bg-[#ffc400] text-[#4d3906] shadow-[0_10px_18px_rgba(255,196,0,0.2)]"
-                    : "bg-[#f6eedc] text-[#6d5449] hover:bg-[#efe4cf]"
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
         </div>
 
         {isLoadingLessons ? (
@@ -1054,11 +1061,10 @@ export function ChildLessonsPage() {
         ) : filteredLessons.length === 0 ? (
           <EmptyLessonsState
             title="Cerita tidak ditemukan"
-            message="Coba pakai kata kunci lain atau pilih filter ALL untuk melihat semua cerita."
-            actionLabel="Reset Filter"
+            message="Coba pakai kata kunci lain untuk melihat cerita yang tersedia."
+            actionLabel="Reset Pencarian"
             onAction={() => {
               setLessonSearch("");
-              setLessonFilter("ALL");
             }}
           />
         ) : (
@@ -1220,6 +1226,41 @@ function getFriendlySummaryError(error?: string) {
   }
 
   return error || "Summary belum bisa dibuat.";
+}
+
+function createFrontendCompletedSummary({
+  storyId,
+  title,
+  fallbackText,
+}: {
+  storyId: string;
+  title: string;
+  fallbackText: string;
+}): StorySummary {
+  const { wasCompleted } = markStoryCompleted(storyId);
+  const rewardCoins = wasCompleted ? 0 : 5;
+  const rewardExp = wasCompleted ? 0 : 10;
+  const currentCoins = readChildCoins(DEFAULT_CHILD_POINTS);
+  const totalCoins = currentCoins + rewardCoins;
+
+  if (rewardCoins > 0) {
+    saveChildCoins(totalCoins);
+  }
+
+  return {
+    session_id: `frontend:${storyId}`,
+    summary:
+      fallbackText ||
+      "Petualangan selesai! Kamu sudah membantu Tomo membuat pilihan dan belajar mengelola uang dengan lebih bijak.",
+    title,
+    description:
+      fallbackText ||
+      "Petualangan selesai! Kamu sudah membantu Tomo membuat pilihan dan belajar mengelola uang dengan lebih bijak.",
+    performance: wasCompleted ? "completed" : "wise",
+    exp: rewardExp,
+    coins: rewardCoins,
+    total_coins: totalCoins,
+  };
 }
 
 export function ChildStoryPlayerPage() {
@@ -1385,10 +1426,18 @@ export function ChildStoryPlayerPage() {
     );
 
     if (summaryResponse.success && summaryResponse.data) {
+      markStoryCompleted(storyId);
       applyStorySummary(summaryResponse.data);
       setStatusMessage("");
     } else {
-      setStatusMessage(message ? getFriendlySummaryError(message) : "Sesi cerita sudah selesai.");
+      applyStorySummary(
+        createFrontendCompletedSummary({
+          storyId,
+          title: snapshot.title || title,
+          fallbackText: node.audio_text,
+        })
+      );
+      setStatusMessage(message ? getFriendlySummaryError(message) : "");
     }
   }
 
@@ -1399,12 +1448,20 @@ export function ChildStoryPlayerPage() {
     setIsSummaryLoading(false);
 
     if (summaryResponse.success && summaryResponse.data) {
+      markStoryCompleted(storyId);
       applyStorySummary(summaryResponse.data);
       setStatusMessage("");
       return;
     }
 
-    setStatusMessage(getFriendlySummaryError(summaryResponse.error));
+    applyStorySummary(
+      createFrontendCompletedSummary({
+        storyId,
+        title: snapshot.title || title,
+        fallbackText: node?.audio_text ?? "",
+      })
+    );
+    setStatusMessage("");
   }
 
   async function pickChoice(choice: "wise" | "impulsive") {

@@ -17,7 +17,12 @@ const FALLBACK_THEMES: StoryThemes = {
     { topic: "Untung dan Rugi (Basic Risk)" },
     { topic: "Pengaruh Iklan dan Godaan Konsumsi" },
   ],
-  story: [{ title: "SNOW WHITE", fullStory: "SNOW WHITE NIKAH" }],
+  story: [
+    {
+      title: "Petualangan Koin Tomo",
+      fullStory: "Tomo belajar memilih antara membeli camilan sekarang atau menabung untuk target impiannya.",
+    },
+  ],
 };
 
 function DropdownArrow() {
