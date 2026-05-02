@@ -131,6 +131,17 @@ export interface StoryAudio {
 export interface StorySummary {
   session_id?: string;
   summary: string;
+  id?: string;
+  title?: string;
+  description?: string;
+  image_url?: string;
+  is_wise?: boolean;
+  performance?: string;
+  exp?: number;
+  coins?: number;
+  total_exp?: number;
+  level?: number;
+  total_coins?: number;
 }
 
 export interface MarketItem {
@@ -475,7 +486,18 @@ function findStoryNodeSource(source: Record<string, unknown>): unknown {
 function normalizeStartedStory(data: unknown, fallbackSessionId = ""): StartedStory | null {
   if (!isRecord(data)) return null;
   const source = isRecord(data.data) ? data.data : data;
-  const node = normalizeStoryNode(findStoryNodeSource(source));
+  const summary = normalizeStorySummary(source);
+  const node =
+    normalizeStoryNode(findStoryNodeSource(source)) ||
+    (getBooleanField(source, ["is_end", "isEnd", "end", "completed"]) && summary
+      ? {
+          node_id: getStringField(source, ["node_id", "nodeId"]) || "ending",
+          audio_text: summary.title || summary.description || summary.summary,
+          image_url: summary.image_url,
+          is_end: true,
+          choices: {},
+        }
+      : null);
   const sessionId = getStringField(source, ["session_id", "sessionId", "session"]) || fallbackSessionId;
 
   if (!sessionId || !node) return null;
@@ -484,7 +506,7 @@ function normalizeStartedStory(data: unknown, fallbackSessionId = ""): StartedSt
     session_id: sessionId,
     node,
     progress: normalizeStoryProgress(source),
-    summary: normalizeStorySummary(source),
+    summary,
   };
 }
 
@@ -510,20 +532,37 @@ function normalizeStoryProgress(data: unknown): StoryProgress | undefined {
 function normalizeStorySummary(data: unknown): StorySummary | undefined {
   if (!isRecord(data)) return undefined;
   const source = isRecord(data.data) ? data.data : data;
+  const summaryObject = isRecord(source.summary) ? source.summary : null;
+  const resultObject = isRecord(source.result) ? source.result : null;
+  const detailSource = summaryObject || resultObject || source;
   const summary =
-    getStringField(source, ["summary", "summary_text", "summaryText", "text", "message", "content"]) ||
-    (isRecord(source.summary)
-      ? getStringField(source.summary, ["summary", "summary_text", "summaryText", "text", "content"])
-      : "") ||
-    (isRecord(source.result)
-      ? getStringField(source.result, ["summary", "summary_text", "summaryText", "text", "content"])
-      : "");
+    getStringField(detailSource, [
+      "summary",
+      "summary_text",
+      "summaryText",
+      "description",
+      "text",
+      "message",
+      "content",
+    ]) ||
+    getStringField(source, ["summary", "summary_text", "summaryText", "description", "text", "message", "content"]);
 
   if (!summary) return undefined;
 
   return {
-    session_id: getStringField(source, ["session_id", "sessionId", "id"]),
+    id: getStringField(detailSource, ["id", "_id"]),
+    session_id: getStringField(source, ["session_id", "sessionId"]),
     summary,
+    title: getStringField(detailSource, ["title", "name"]),
+    description: getStringField(detailSource, ["description", "summary", "summary_text", "summaryText"]),
+    image_url: getStringField(detailSource, ["image_url", "imageUrl"]),
+    is_wise: getBooleanField(detailSource, ["is_wise", "isWise", "wise"]),
+    performance: getStringField(detailSource, ["performance", "performance_level", "performanceLevel"]),
+    exp: getNumberField(detailSource, ["exp", "xp"]),
+    coins: getNumberField(detailSource, ["coins", "coin"]),
+    total_exp: getNumberField(detailSource, ["total_exp", "totalExp"]),
+    level: getNumberField(detailSource, ["level"]),
+    total_coins: getNumberField(detailSource, ["total_coins", "totalCoins"]),
   };
 }
 
@@ -1057,6 +1096,17 @@ export const childrenApi = {
       data: {
         session_id: summary.session_id || sessionId,
         summary: summary.summary,
+        id: summary.id,
+        title: summary.title,
+        description: summary.description,
+        image_url: summary.image_url,
+        is_wise: summary.is_wise,
+        performance: summary.performance,
+        exp: summary.exp,
+        coins: summary.coins,
+        total_exp: summary.total_exp,
+        level: summary.level,
+        total_coins: summary.total_coins,
       },
     };
   },

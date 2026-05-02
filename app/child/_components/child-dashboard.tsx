@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { childrenApi, type ChildStoryHeader, type MarketItem, type StoryNode } from "@/lib/api";
+import { childrenApi, type ChildStoryHeader, type MarketItem, type StoryNode, type StorySummary } from "@/lib/api";
 import { getChildAvatarSrc } from "@/lib/child-avatar";
 import { readChildCoins, saveChildCoins } from "@/lib/child-coins";
 import { readSavingTargetId, saveSavingTargetId } from "@/lib/saving-target";
@@ -892,15 +892,25 @@ function StoryProgress({
 }: {
   title: string;
   steps: number;
-  totalSteps: number;
+  totalSteps?: number;
   percentage?: number;
   isComplete: boolean;
 }) {
   const page = Math.max(1, steps + 1);
-  const displayTotal = Math.max(page, totalSteps);
+  const displayTotal = totalSteps ? Math.max(page, totalSteps) : undefined;
   const progressWidth = isComplete
     ? 100
-    : Math.min(100, Math.max(0, percentage ?? (page / displayTotal) * 100));
+    : Math.min(
+        92,
+        Math.max(0, percentage ?? (displayTotal ? (page / displayTotal) * 100 : 18 + steps * 24))
+      );
+  const progressLabel = isComplete
+    ? "Selesai"
+    : displayTotal
+      ? `Halaman ${page} dari ${displayTotal}`
+      : steps === 0
+        ? "Mulai cerita"
+        : `Langkah ${page}`;
 
   return (
     <div className="mx-auto max-w-[560px] text-center">
@@ -915,7 +925,7 @@ function StoryProgress({
           />
         </div>
         <span className="text-[0.75rem] font-black text-[#2d2924]">
-          {isComplete ? "Selesai" : `Halaman ${page} dari ${displayTotal}`}
+          {progressLabel}
         </span>
       </div>
     </div>
@@ -927,6 +937,29 @@ function isSessionCompleteMessage(message?: string) {
   return normalized.includes("session") && normalized.includes("complete");
 }
 
+function getSummaryDisplayText(summary?: StorySummary) {
+  return summary?.description || summary?.summary || summary?.title || "";
+}
+
+function getFriendlySummaryError(error?: string) {
+  const normalized = (error ?? "").toLowerCase();
+
+  if (normalized.includes("story summary reward already claimed")) {
+    return "Hadiah cerita sudah pernah diklaim.";
+  }
+
+  if (
+    normalized.includes("sqlstate") ||
+    normalized.includes("column") ||
+    normalized.includes("relation") ||
+    normalized.includes("database")
+  ) {
+    return "Rangkuman cerita sudah tampil, tapi hadiah belum bisa diklaim. Coba lagi nanti.";
+  }
+
+  return error || "Summary belum bisa dibuat.";
+}
+
 export function ChildStoryPlayerPage() {
   const params = useParams<{ storyId: string }>();
   const router = useRouter();
@@ -935,16 +968,37 @@ export function ChildStoryPlayerPage() {
   const [sessionId, setSessionId] = useState("");
   const [node, setNode] = useState<StoryNode | null>(null);
   const [stepsTaken, setStepsTaken] = useState(0);
-  const [totalStorySteps, setTotalStorySteps] = useState(10);
+  const [totalStorySteps, setTotalStorySteps] = useState<number | undefined>();
   const [progressPercentage, setProgressPercentage] = useState<number | undefined>();
   const [statusMessage, setStatusMessage] = useState("Memulai cerita...");
   const [isChoosing, setIsChoosing] = useState<"wise" | "impulsive" | null>(null);
   const [summaryText, setSummaryText] = useState("");
+  const [summaryTitle, setSummaryTitle] = useState("");
+  const [summaryImageUrl, setSummaryImageUrl] = useState("");
+  const [storyReward, setStoryReward] = useState<Pick<StorySummary, "exp" | "coins" | "total_exp" | "level" | "total_coins" | "performance"> | null>(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const decisionInFlightRef = useRef(false);
   const activeNodeIdRef = useRef("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  function applyStorySummary(summary: StorySummary) {
+    setSummaryText(getSummaryDisplayText(summary));
+    setSummaryTitle(summary.title ?? "");
+    setSummaryImageUrl(summary.image_url ?? "");
+    setStoryReward({
+      exp: summary.exp,
+      coins: summary.coins,
+      total_exp: summary.total_exp,
+      level: summary.level,
+      total_coins: summary.total_coins,
+      performance: summary.performance,
+    });
+
+    if (typeof summary.total_coins === "number") {
+      saveChildCoins(summary.total_coins);
+    }
+  }
 
   useEffect(() => {
     activeNodeIdRef.current = node?.node_id ?? "";
@@ -974,9 +1028,11 @@ export function ChildStoryPlayerPage() {
         setSessionId(response.data.session_id);
         setNode(response.data.node);
         setStepsTaken(progress?.steps_taken ?? 0);
-        setTotalStorySteps(progress?.total_steps ?? 10);
+        setTotalStorySteps(progress?.total_steps);
         setProgressPercentage(progress?.percentage);
-        setSummaryText(response.data.summary?.summary ?? "");
+        if (response.data.summary) {
+          applyStorySummary(response.data.summary);
+        }
         setStatusMessage("");
       } else {
         setStatusMessage(response.error ?? "Story belum bisa dimulai.");
@@ -1067,11 +1123,26 @@ export function ChildStoryPlayerPage() {
     );
 
     if (summaryResponse.success && summaryResponse.data) {
-      setSummaryText(summaryResponse.data.summary);
+      applyStorySummary(summaryResponse.data);
       setStatusMessage("");
     } else {
-      setStatusMessage(message ?? "Sesi cerita sudah selesai.");
+      setStatusMessage(message ? getFriendlySummaryError(message) : "Sesi cerita sudah selesai.");
     }
+  }
+
+  async function generateCompletedStorySummary(nextSessionId: string) {
+    setIsSummaryLoading(true);
+    setStatusMessage("Menyusun rangkuman dan hadiah cerita...");
+    const summaryResponse = await childrenApi.getStorySummary(nextSessionId);
+    setIsSummaryLoading(false);
+
+    if (summaryResponse.success && summaryResponse.data) {
+      applyStorySummary(summaryResponse.data);
+      setStatusMessage("");
+      return;
+    }
+
+    setStatusMessage(getFriendlySummaryError(summaryResponse.error));
   }
 
   async function pickChoice(choice: "wise" | "impulsive") {
@@ -1094,18 +1165,17 @@ export function ChildStoryPlayerPage() {
         setStepsTaken((current) => progress?.steps_taken ?? current + 1);
         setTotalStorySteps((current) => progress?.total_steps ?? current);
         setProgressPercentage(progress?.percentage);
-        setSummaryText(nextStory.summary?.summary ?? "");
+        if (nextStory.summary) {
+          applyStorySummary(nextStory.summary);
+        } else {
+          setSummaryText("");
+          setSummaryTitle("");
+          setSummaryImageUrl("");
+          setStoryReward(null);
+        }
 
-        if (nextStory.node.is_end && nextChoices.length === 0 && !nextStory.summary?.summary) {
-          setIsSummaryLoading(true);
-          const summaryResponse = await childrenApi.getStorySummary(nextStory.session_id);
-          setIsSummaryLoading(false);
-
-          if (summaryResponse.success && summaryResponse.data) {
-            setSummaryText(summaryResponse.data.summary);
-          } else {
-            setStatusMessage(summaryResponse.error ?? "Summary belum bisa dibuat.");
-          }
+        if (nextStory.node.is_end && nextChoices.length === 0) {
+          await generateCompletedStorySummary(nextStory.session_id);
         }
       } else if (isSessionCompleteMessage(response.error)) {
         await finishCompletedSession(response.error);
@@ -1126,9 +1196,10 @@ export function ChildStoryPlayerPage() {
     : [];
   const isEnd = Boolean(node?.is_end) && choiceEntries.length === 0;
   const nodeImage = node
-    ? getRandomStoryImageSrc(node.node_id, node.image_url || snapshot.imageSrc)
+    ? getRandomStoryImageSrc(node.node_id, summaryImageUrl || node.image_url || snapshot.imageSrc)
     : snapshot.imageSrc || "";
   const finalText = summaryText || node?.audio_text || "";
+  const finalTitle = summaryTitle || "Cerita selesai";
 
   return (
     <main className="min-h-screen bg-[#fbf5e8] pb-16">
@@ -1168,17 +1239,32 @@ export function ChildStoryPlayerPage() {
               <div className="relative z-10 flex min-h-[24rem] items-end">
                 <div className="max-w-[760px]">
                   <span className="rounded-full bg-[#ffc400] px-4 py-1 text-[0.72rem] font-black uppercase tracking-[0.16em] text-[#4d3906]">Cerita selesai</span>
+                  {summaryTitle ? (
+                    <p className="mt-4 text-[0.92rem] font-black uppercase tracking-[0.16em] text-[#ffc400]">
+                      {finalTitle}
+                    </p>
+                  ) : null}
                   <h1 className="mt-4 text-[clamp(1.7rem,3.4vw,3.6rem)] font-black leading-tight text-white drop-shadow-[0_3px_10px_rgba(0,0,0,.5)]">
                     {isSummaryLoading ? "Menyusun rangkuman cerita..." : finalText}
                   </h1>
                   <div className="mt-8 grid max-w-sm grid-cols-2 gap-0">
                     <div className="rounded-l-[1rem] bg-white px-6 py-5 text-center shadow-[0_12px_20px_rgba(103,78,38,0.1)]">
                       <Icon name="star" className="mx-auto h-8 w-8 text-[#fa9818]" />
-                      <p className="mt-2 text-[1rem] font-black text-[#5b4635]">XP</p>
+                      <p className="mt-2 text-[1rem] font-black text-[#5b4635]">
+                        {typeof storyReward?.exp === "number" ? `+${storyReward.exp} XP` : "XP"}
+                      </p>
+                      {typeof storyReward?.level === "number" ? (
+                        <p className="mt-1 text-[0.72rem] font-black text-[#806006]">Level {storyReward.level}</p>
+                      ) : null}
                     </div>
                     <div className="rounded-r-[1rem] bg-white px-6 py-5 text-center shadow-[0_12px_20px_rgba(103,78,38,0.1)]">
                       <Icon name="coin" className="mx-auto h-8 w-8 text-[#ffc400]" />
-                      <p className="mt-2 text-[1rem] font-black text-[#5b4635]">Badge</p>
+                      <p className="mt-2 text-[1rem] font-black text-[#5b4635]">
+                        {typeof storyReward?.coins === "number" ? `+${storyReward.coins} Koin` : "Koin"}
+                      </p>
+                      {storyReward?.performance ? (
+                        <p className="mt-1 text-[0.72rem] font-black uppercase text-[#806006]">{storyReward.performance}</p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
